@@ -1,6 +1,7 @@
 import opcodes from './opcodes.json'
+import { Memory } from './memory.js'
 
-class CPU {
+export class CPU {
     constructor(memory) {
         //registers
         this.registers = {
@@ -184,6 +185,21 @@ class CPU {
         return opcode.unprefixed[opcodeHex]
     }
 
+    getAddress(operand) {
+        switch (operand.name) {
+            case 'BC':
+                return (this.registers.B << 8) | this.registers.C
+            case 'DE':
+                return (this.registers.D << 8) | this.registers.E
+            case 'HL': 
+                return (this.registers.H << 8) | this.registers.L
+            case 'n16':
+                return this.memory.readWord(this.registers.PC - 2)
+            default:
+                throw new Error(`Invalid operand for address calculation: ${operand.name}`)
+        }
+    }
+
     //add instructions
     ADD(operands) {
         const [dest, source] = operands
@@ -226,12 +242,11 @@ class CPU {
             this.registers.H = (result >> 8) & 0xFF
             this.registers.L = result & 0xFF
 
-            if (!source.e8) {
             this.setFlag('Z', false) //zero flag
             this.setFlag('N', false) // subtract flag
             this.setFlag('H', (hl & 0xFFF) + (value & 0xFFF) > 0xFFF) // half flag
             this.setFlag('C', (hl + value) > 0xFFFF) // carry flag
-            }
+            
             return
         }
 
@@ -283,28 +298,80 @@ class CPU {
         const [dest, source] = operands
 
         //handle 16-bit operations
-        if (source.name === 'n16') {
-            const value = this.memory.readByte(this.registers.PC - 2)
-            switch (dest.name) {
-                case 'BC':
-                    this.registers.B = (value >> 8) & 0xFF
-                    this.registers.C = value & 0xFF
-                    break
-                case 'DE':
-                    this.registers.D = (value >> 8) & 0xFF
-                    this.registers.E = value & 0xFF
-                    break
-                case 'HL':
-                    this.registers.H = (value >> 8) & 0xFF
-                    this.registers.L = value & 0xFF
-                    break
-                case 'SP':
-                    this.registers.SP = value
-                    break
+        if (source.name === 'n16' || dest.name === 'n16') {
+            if (source.name === 'n16') {
+                const value = this.memory.readByte(this.registers.PC - 2)
+                switch (dest.name) {
+                    case 'BC':
+                        this.registers.B = (value >> 8) & 0xFF
+                        this.registers.C = value & 0xFF
+                        break
+                    case 'DE':
+                        this.registers.D = (value >> 8) & 0xFF
+                        this.registers.E = value & 0xFF
+                        break
+                    case 'HL':
+                        this.registers.H = (value >> 8) & 0xFF
+                        this.registers.L = value & 0xFF
+                        break
+                    case 'SP':
+                        this.registers.SP = value
+                        break
+                }
+                this.clock += 12
+            }
+            else {
+                //copy SP at address (LD (nn), SP)
+                const address = this.memory.readWord(this.registers.PC - 2)
+                this.memory.writeWord(address, this.registers.SP)
+                this.clock += 20
+            }
+
+            return
+        }
+
+        //handle SP special cases
+        if (dest.name === 'SP') {
+            if (source.name === 'HL') {
+                this.registers.SP = (this.registers.H << 8) | this.registers.L
+                this.clock += 8
+                return
             }
         }
 
+        //handle HL special cases
+        if (dest.name === 'HL' && source.name === 'SP') {
+            const e8 = this.memory.readByte(this.registers.PC - 1)
+            const signedE8 = (e8 & 0x80) ? e8 - 256 : e8
+            const result = (this.registers.SP + signedE8) & 0xFFFF
+
+            this.registers.H = (result >> 8) & 0xFF
+            this.registers.L = result & 0xFF
+
+            this.setFlag('Z', false) //zero flag
+            this.setFlag('N', false) // subtract flag
+            this.setFlag('H', (this.registers.SP & 0xF) + (e8 & 0xF) > 0xF) // half flag
+            this.setFlag('C', (this.registers.SP & 0xFF) + (e8 & 0xFF) > 0xFF) // carry flag
+            
+            this.clock += 12
+            return
+        }
+
+
         //handle 8-bit operations
+        if (source.name === 'n8') {
+            const value = this.memory.readByte(this.registers.PC - 1)
+            if (dest.name === 'A') {
+                this.registers.A = value
+            }
+            else if (dest.name === 'HL') {
+                this.memory.writeByte(this.getAddress(dest), value)
+            }
+            else {
+                throw new Error('Invalid destination for LD n8')
+            }
+        }
+
         const value = source.immediate ?
             this.registers[source.name] :
             this.memory.readByte(this.getAddress(source))
