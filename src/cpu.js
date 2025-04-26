@@ -1,3 +1,5 @@
+import opcodes from './opcodes.json'
+
 class CPU {
     constructor(memory) {
         //registers
@@ -39,7 +41,9 @@ class CPU {
 
     //execute a single instruction
     executeInstruction() {
+        //read opcode from memory at current PC
         const opcode = this.memory.readByte(this.registers.PC)
+        //get instruction data from opcodes.json
         const instruction = this.decodeInstruction(opcode)
 
         if (!instruction) {
@@ -143,7 +147,7 @@ class CPU {
                 throw new Error (`Unimplemented instruction: ${instruction.mnemonic}`)
         }
     }
-        //helper methods for flag operations
+    //helper methods for flag operations
     setFlag(flag, value) {
         switch (flag) {
             case 'Z':
@@ -174,7 +178,145 @@ class CPU {
         }
     }
 
-    
+    //decode instruction from opcodes.json
+    decodeInstruction(opcode) {
+        const opcodeHex = `0x${opcode.toString(16).toUpperCase().padStart(2, '0')}`
+        return opcode.unprefixed[opcodeHex]
+    }
+
+    //add instructions
+    ADD(operands) {
+        const [dest, source] = operands
+
+        //handle 16-bit operations
+        if (dest.name === 'HL') {
+            const hl = (this.registers.H << 8) | this.registers.L
+            let value
+
+            switch (source.name) {
+                case 'BC':
+                    value = (this.registers.B << 8) | this.registers.C
+                    break
+                case 'DE':
+                    value = (this.registers.D << 8) | this.registers.E
+                    break
+                case 'HL':
+                    value = (this.registers.H << 8) | this.registers.L
+                    break
+                case 'SP':
+                    if (source.e8) {
+                        const e8 = this.memory.readByte(this.registers.PC - 1)
+                        const signedE8 = (e8 & 0x80) ? e8 - 256 : e8
+                        value = (this.registers.SP + signedE8) & 0xFFFF
+
+                        this.setFlag('Z', false) //zero flag
+                        this.setFlag('N', false) // subtract flag
+                        this.setFlag('H', (this.registers.SP & 0xF) + (e8 & 0xF) > 0xF) // half flag
+                        this.setFlag('C', (this.registers.SP & 0xFF) + (e8 & 0xFF) > 0xFF) // carry flag
+                    }
+                    else {
+                        value = this.registers.SP
+                    }
+                    break
+                default:
+                    throw new Error(`Invalid source for ADD HL: ${source.name}`)
+            }
+
+            const result = (hl + value) & 0xFFFF
+            this.registers.H = (result >> 8) & 0xFF
+            this.registers.L = result & 0xFF
+
+            if (!source.e8) {
+            this.setFlag('Z', false) //zero flag
+            this.setFlag('N', false) // subtract flag
+            this.setFlag('H', (hl & 0xFFF) + (value & 0xFFF) > 0xFFF) // half flag
+            this.setFlag('C', (hl + value) > 0xFFFF) // carry flag
+            }
+            return
+        }
+
+        //handle SP + e8 operations
+        if (dest.name === 'SP') {
+            const e8 = this.memory.readByte(this.registers.PC - 1)
+            const signedE8 = (e8 & 0x80) ? e8 - 256 : e8
+            const result = (this.registers.SP + signedE8) & 0xFFFF
+
+            this.setFlag('Z', false) //zero flag
+            this.setFlag('N', false) // subtract flag
+            this.setFlag('H', (this.registers.SP & 0xF) + (e8 & 0xF) > 0xF) // half flag
+            this.setFlag('C', (this.registers.SP & 0xFF) + (e8 & 0xFF) > 0xFF) // carry flag
+
+            this.registers.SP = result
+            return
+        }
+
+        if (dest.name !== 'A') {
+            throw new Error('8-bit ADD operations are only supported for register A')
+        }
+        //handle 8-bit operations
+        let value
+        if (source.name === 'n8') {
+            value = this.memory.readByte(this.registers.PC - 1)
+        }
+        else {
+            value = source.immediate ?
+                this.registers[source.name] :
+                this.memory.readByte(this.getAddress(source))
+        }
+
+        const result = (this.registers[dest.name] + value) & 0xFF
+
+        this.setFlag('Z', result === 0) //zero flag
+        this.setFlag('N', false) // subtract flag
+        this.setFlag('H', (this.registers[dest.name] & 0xF) + (value & 0xF) > 0xF) // half flag
+        this.setFlag('C', (this.registers[dest.name] + value > 0xFF)) // carry flag
+
+        this.registers[dest.name] = result
+
+        this.clock += dest.name === 'HL' ? 8 :
+                    dest.name === 'SP' ? 16 :
+                    source.immediate ? 8 : 4
+    }
+
+    //load instructions
+    LD(operands) {
+        const [dest, source] = operands
+
+        //handle 16-bit operations
+        if (source.name === 'n16') {
+            const value = this.memory.readByte(this.registers.PC - 2)
+            switch (dest.name) {
+                case 'BC':
+                    this.registers.B = (value >> 8) & 0xFF
+                    this.registers.C = value & 0xFF
+                    break
+                case 'DE':
+                    this.registers.D = (value >> 8) & 0xFF
+                    this.registers.E = value & 0xFF
+                    break
+                case 'HL':
+                    this.registers.H = (value >> 8) & 0xFF
+                    this.registers.L = value & 0xFF
+                    break
+                case 'SP':
+                    this.registers.SP = value
+                    break
+            }
+        }
+
+        //handle 8-bit operations
+        const value = source.immediate ?
+            this.registers[source.name] :
+            this.memory.readByte(this.getAddress(source))
+
+        if (dest.immediate) {
+            this.registers[dest.name] = value
+        }
+        else {
+            const address = this.getAddress(dest)
+            this.memory.writeByte(address, value)
+        }
+    }
 
 }
 
