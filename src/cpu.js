@@ -300,7 +300,7 @@ export class CPU {
         //handle 16-bit operations
         if (source.name === 'n16' || dest.name === 'n16') {
             if (source.name === 'n16') {
-                const value = this.memory.readByte(this.registers.PC - 2)
+                const value = this.memory.readWord(this.registers.PC - 2)
                 switch (dest.name) {
                     case 'BC':
                         this.registers.B = (value >> 8) & 0xFF
@@ -317,6 +317,8 @@ export class CPU {
                     case 'SP':
                         this.registers.SP = value
                         break
+                    default:
+                        throw new Error(`Invalid destination for LD n16: ${dest.name}`)
                 }
                 this.clock += 12
             }
