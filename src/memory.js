@@ -1,15 +1,16 @@
 export class Memory {
     constructor() {
-        this.memory = new Uint8Array(65536) // 64KB of memory
-        this.memory.fill(0)
+        //32kb of ROM (0x0000 - 0x7FFF)
+        this.rom = new Uint8Array(32768)
+        this.rom.fill(0)
     }
 
     readByte(address) {
-        return this.memory[address]
+        return this.rom[address]
     }
 
     writeByte(address, value) {
-        this.memory[address] = value
+        this.rom[address] = value
     }
 
     readWord(address) {

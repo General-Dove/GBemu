@@ -2,7 +2,7 @@ import opcodes from './opcodes.json'
 import { Memory } from './memory.js'
 
 export class CPU {
-    constructor(memory) {
+    constructor(rom) {
         //registers
         this.registers = {
             A: 0x00, //accumulator
@@ -19,7 +19,7 @@ export class CPU {
 
         this.clock = 0
 
-        this.memory = memory
+        this.rom = rom
     }
 
     reset() {
@@ -43,7 +43,7 @@ export class CPU {
     //execute a single instruction
     executeInstruction() {
         //read opcode from memory at current PC
-        const opcode = this.memory.readByte(this.registers.PC)
+        const opcode = this.rom.readByte(this.registers.PC)
         //get instruction data from opcodes.json
         const instruction = this.decodeInstruction(opcode)
 
@@ -194,7 +194,7 @@ export class CPU {
             case 'HL': 
                 return (this.registers.H << 8) | this.registers.L
             case 'n16':
-                return this.memory.readWord(this.registers.PC - 2)
+                return this.rom.readWord(this.registers.PC - 2)
             default:
                 throw new Error(`Invalid operand for address calculation: ${operand.name}`)
         }
@@ -221,7 +221,7 @@ export class CPU {
                     break
                 case 'SP':
                     if (source.e8) {
-                        const e8 = this.memory.readByte(this.registers.PC - 1)
+                        const e8 = this.rom.readByte(this.registers.PC - 1)
                         const signedE8 = (e8 & 0x80) ? e8 - 256 : e8
                         value = (this.registers.SP + signedE8) & 0xFFFF
 
@@ -252,7 +252,7 @@ export class CPU {
 
         //handle SP + e8 operations
         if (dest.name === 'SP') {
-            const e8 = this.memory.readByte(this.registers.PC - 1)
+            const e8 = this.rom.readByte(this.registers.PC - 1)
             const signedE8 = (e8 & 0x80) ? e8 - 256 : e8
             const result = (this.registers.SP + signedE8) & 0xFFFF
 
@@ -271,12 +271,12 @@ export class CPU {
         //handle 8-bit operations
         let value
         if (source.name === 'n8') {
-            value = this.memory.readByte(this.registers.PC - 1)
+            value = this.rom.readByte(this.registers.PC - 1)
         }
         else {
             value = source.immediate ?
                 this.registers[source.name] :
-                this.memory.readByte(this.getAddress(source))
+                this.rom.readByte(this.getAddress(source))
         }
 
         const result = (this.registers[dest.name] + value) & 0xFF
@@ -300,7 +300,7 @@ export class CPU {
         //handle 16-bit operations
         if (source.name === 'n16' || dest.name === 'n16') {
             if (source.name === 'n16') {
-                const value = this.memory.readWord(this.registers.PC - 2)
+                const value = this.rom.readWord(this.registers.PC - 2)
                 switch (dest.name) {
                     case 'BC':
                         this.registers.B = (value >> 8) & 0xFF
@@ -324,8 +324,8 @@ export class CPU {
             }
             else {
                 //copy SP at address (LD (nn), SP)
-                const address = this.memory.readWord(this.registers.PC - 2)
-                this.memory.writeWord(address, this.registers.SP)
+                const address = this.rom.readWord(this.registers.PC - 2)
+                this.rom.writeWord(address, this.registers.SP)
                 this.clock += 20
             }
 
@@ -343,7 +343,7 @@ export class CPU {
 
         //handle HL special cases
         if (dest.name === 'HL' && source.name === 'SP') {
-            const e8 = this.memory.readByte(this.registers.PC - 1)
+            const e8 = this.rom.readByte(this.registers.PC - 1)
             const signedE8 = (e8 & 0x80) ? e8 - 256 : e8
             const result = (this.registers.SP + signedE8) & 0xFFFF
 
@@ -359,31 +359,30 @@ export class CPU {
             return
         }
 
-
         //handle 8-bit operations
-        if (source.name === 'n8') {
-            const value = this.memory.readByte(this.registers.PC - 1)
-            if (dest.name === 'A') {
-                this.registers.A = value
-            }
-            else if (dest.name === 'HL') {
-                this.memory.writeByte(this.getAddress(dest), value)
+        if (source.name === 'n8' || dest.name === 'n8') {
+            if (source.name === 'n8') {
+                const value = this.rom.readByte(this.registers.PC - 1)
+                if (dest.immediate) {
+                    this.registers[dest.name] = value
+                }
+                else {
+                    this.rom.writeByte(this.getAddress(dest), value)
+                }
+                this.clock += dest.immediate ? 8 : 12
+                return
             }
             else {
-                throw new Error('Invalid destination for LD n8')
+                const value = this.registers[source.name]
+                this.rom.writeByte(this.getAddress(dest), value)
+                this.clock += 12
+                return
             }
         }
 
-        const value = source.immediate ?
-            this.registers[source.name] :
-            this.memory.readByte(this.getAddress(source))
-
-        if (dest.immediate) {
-            this.registers[dest.name] = value
-        }
-        else {
-            const address = this.getAddress(dest)
-            this.memory.writeByte(address, value)
+        if (dest.name === 'HL' && increment) {
+            const value = this.registers[source.name]
+            this.rom.writeByte().value = value + 1
         }
     }
 

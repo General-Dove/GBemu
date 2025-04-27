@@ -3,11 +3,11 @@ import { default as Memory } from '../src/memory.js';
 
 describe('CPU - ADD Instructions', () => {
     let cpu;
-    let memory;
+    let rom;
 
     beforeEach(() => {
-        memory = new Memory();
-        cpu = new CPU(memory);
+        rom= new Memory();
+        cpu = new CPU(rom);
         cpu.reset(); // Reset CPU state before each test
     })
 
