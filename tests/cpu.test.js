@@ -29,7 +29,7 @@ describe('CPU - ADD Instructions', () => {
         })
     })
 
-    describe('ADD HL, rr (16-but operation)', () => {
+    describe('ADD HL, rr (16-bit operation)', () => {
         test('ADD HL, BC should add BC to HL', () => {
             cpu.registers.H = 0x8A
             cpu.registers.L = 0x23
@@ -46,6 +46,23 @@ describe('CPU - ADD Instructions', () => {
             expect(cpu.getFlag('N')).toBe(false) // Subtract flag should be reset
             expect(cpu.getFlag('H')).toBe(true) // Half carry flag should be set
             expect(cpu.getFlag('C')).toBe(false) // Carry flag should be set
+        })
+    })
+
+    describe('LD HL+, A', () => {
+        test('LD HL+, A should load A into memory at HL and increment HL', () => {
+            cpu.registers.H = 0x8A
+            cpu.registers.L = 0x23
+            cpu.registers.A = 0x5A
+
+            cpu.LD([
+                {name: 'HL', immediate: false, increment: true},
+                {name: 'A', immediate: true}
+            ])
+
+            expect(cpu.rom.readByte(0x8A23)).toBe(0x5A) // Memory at HL should be 0x5A
+            expect(cpu.registers.H).toBe(0x8A)
+            expect(cpu.registers.L).toBe(0x24) // HL should be incremented to 0x8A24
         })
     })
 })

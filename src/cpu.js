@@ -380,9 +380,52 @@ export class CPU {
             }
         }
 
-        if (dest.name === 'HL' && increment) {
-            const value = this.registers[source.name]
-            this.rom.writeByte().value = value + 1
+        if (dest.name === 'HL' && dest.increment) {
+            const address = this.registers.H << 8 | this.registers.L
+            this.rom.writeByte(address, this.registers.A)
+
+            const newValue = (address + 1) & 0xFFFF
+            this.registers.H = (newValue >> 8) & 0xFF
+            this.registers.L = newValue & 0xFF
+
+            this.clock += 8
+            return
+        }
+        
+        if (dest.name === 'HL' && dest.decrement) {
+            const value = this.registers.H << 8 | this.registers.L
+            this.registers.A = this.rom.readByte(value)
+
+            const newValue = (value - 1) & 0xFFFF
+            this.registers.H = (newValue >> 8) & 0xFF
+            this.registers.L = newValue & 0xFF
+
+            this.clock += 8
+            return
+        }
+
+        if (source.name === 'HL' && source.increment) {
+            const value = this.registers.H << 8 | this.registers.L
+            this.rom.writeByte(value, this.registers.A)
+
+            const newValue = (value + 1) & 0xFFFF
+            this.registers.H = (newValue >> 8) & 0xFF
+            this.registers.L = newValue & 0xFF
+
+            this.clock += 8
+            return
+        }
+
+        if (source.name === 'HL' && source.decrement) {
+            const value = this.registers.H << 8 | this.registers.L
+            this.rom.writeByte(value, this.registers.A)
+
+            const newValue = (value - 1) & 0xFFFF
+            this.registers.H = (newValue >> 8) & 0xFF
+            this.registers.L = newValue & 0xFF
+
+            this.clock += 8
+            return
         }
     }
 
