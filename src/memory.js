@@ -1,26 +1,34 @@
 export class Memory {
-    constructor() {
-        //32kb of ROM (0x0000 - 0x7FFF)
-        this.rom = new Uint8Array(32768)
-        this.rom.fill(0)
+  constructor() {
+    //64kb of ROM (0x0000 - 0x10000)
+    this.rom = new Uint8Array(65536);
+    this.rom.fill(0);
+  }
+
+  readByte(address) {
+    if (address < 0 || address >= this.rom.length) {
+      throw new Error(`Memory address out of bounds: ${address}`);
     }
 
-    readByte(address) {
-        return this.rom[address]
+    return this.rom[address];
+  }
+
+  writeByte(address, value) {
+    if (address < 0 || address >= this.rom.length) {
+      throw new Error(`Memory address out of bounds: ${address}`);
     }
 
-    writeByte(address, value) {
-        this.rom[address] = value
-    }
+    this.rom[address] = value;
+  }
 
-    readWord(address) {
-        return (this.readByte(address + 1) << 8) | this.readByte(address)
-    }
+  readWord(address) {
+    return (this.readByte(address + 1) << 8) | this.readByte(address);
+  }
 
-    writeWord(address, value) {
-        this.writeByte(address, value & 0xFF)
-        this.writeByte(address + 1, (value >> 8) & 0xFF)
-    }
+  writeWord(address, value) {
+    this.writeByte(address, value & 0xff);
+    this.writeByte(address + 1, (value >> 8) & 0xff);
+  }
 }
 
-export default Memory
+export default Memory;
