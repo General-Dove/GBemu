@@ -278,7 +278,8 @@ export class CPU {
   // Decode instruction from opcodes.json
   decodeInstruction(opcode) {
     let opcodeHex = `0x${opcode.toString(16).toUpperCase().padStart(2, "0")}`;
-
+    
+    // Decode intstruction from prefixed opcodes
     if (opcodeHex === '0xCB') {
         const nextByte = this.rom.readByte(this.registers.PC + 1);
         opcodeHex = `0x${nextByte.toString(16).toUpperCase().padStart(2, "0")}`;
