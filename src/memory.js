@@ -98,6 +98,8 @@ export class Memory {
       console.log(`Loaded ROM: ${filepath}, size: ${romData.length}`);
       console.log("Verifying memory at 0x100:");
       console.log(`0x100: 0x${this.readByte(0x100).toString(16).padStart(2, "0")}`);
+      console.log(`0x101: 0x${this.readByte(0x100).toString(16).padStart(2, "0")}`);
+      console.log(`0x102: 0x${this.readByte(0x100).toString(16).padStart(2, "0")}`);
     } catch (error) {
       throw new Error(`Failed to load ROM: ${error.message}`);
     }

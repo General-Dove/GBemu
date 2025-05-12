@@ -1,4 +1,4 @@
-import opcodes from "./opcodes.json";
+import opcodes from "./opcodes.json" with { type: "json" };
 import { Memory } from "./memory.js";
 
 export class CPU {
@@ -312,8 +312,6 @@ export class CPU {
         return (this.registers.D << 8) | this.registers.E;
       case "HL":
         return (this.registers.H << 8) | this.registers.L;
-      case "n16":
-        return this.memory.readByte(this.registers.PC - 2);
       default:
         throw new Error(
           `Invalid operand for address calculation: ${operand.name}`
@@ -1046,7 +1044,112 @@ export class CPU {
 
   RET(operands) {}
 
-  OR(operands) {}
+  OR(operands) {
+    const [dest, source] = operands;
+
+    switch (source.name) {
+      case "n8": {
+        const value = this.memory.readByte(this.registers.PC - 1);
+        const result = this.registers.A | value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "A": {
+        const value = this.registers.A;
+        const result = this.registers.A | value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "B": {
+        const value = this.registers.B;
+        const result = this.registers.A | value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "C": {
+        const value = this.registers.C;
+        const result = this.registers.A | value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "D": {
+        const value = this.registers.D;
+        const result = this.registers.A | value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "E": {
+        const value = this.registers.E;
+        const result = this.registers.A | value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "H": {
+        const value = this.registers.H;
+        const result = this.registers.A | value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "L": {
+        const value = this.registers.L;
+        const result = this.registers.A | value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "HL": {
+        const address = this.getAddress(source);
+        const value = this.memory.readByte(address);
+        const result = this.registers.A | value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+    }
+  }
 
   POP(operands) {}
 
@@ -1060,7 +1163,112 @@ export class CPU {
 
   SWAP(operands) {}
 
-  AND(operands) {}
+  AND(operands) {
+    const [dest, source] = operands;
+
+    switch (source.name) {
+      case "n8": {
+        const value = this.memory.readByte(this.registers.PC - 1);
+        const result = this.registers.A & value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "A": {
+        const value = this.registers.A;
+        const result = this.registers.A & value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "B": {
+        const value = this.registers.B;
+        const result = this.registers.A & value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "C": {
+        const value = this.registers.C;
+        const result = this.registers.A & value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "D": {
+        const value = this.registers.D;
+        const result = this.registers.A & value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "E": {
+        const value = this.registers.E;
+        const result = this.registers.A & value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "H": {
+        const value = this.registers.H;
+        const result = this.registers.A & value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "L": {
+        const value = this.registers.L;
+        const result = this.registers.A & value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "HL": {
+        const address = this.getAddress(source);
+        const value = this.memory.readByte(address);
+        const result = this.registers.A & value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", true); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+    }
+  }
 
   RST(operands) {}
 

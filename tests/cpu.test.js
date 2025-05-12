@@ -329,7 +329,7 @@ describe("CPU - Decode Instructions", () => {
 
     describe("INC 8-bit register", () => {
       test("INC register B by 1", () => {
-        memory.writeByte(0xC000, 0x04);
+        memory.writeByte(0xc000, 0x04);
 
         cpu.registers.B = 0x42;
         cpu.registers.PC = 0xc000;
@@ -340,16 +340,16 @@ describe("CPU - Decode Instructions", () => {
         expect(cpu.getFlag("Z")).toBe(false);
         expect(cpu.getFlag("N")).toBe(false);
         expect(cpu.getFlag("H")).toBe(false);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(4);
       });
     });
 
     describe("INC 8-bit register", () => {
       test("INC register B by 1, half carry flag true", () => {
-        memory.writeByte(0xC000, 0x04);
+        memory.writeByte(0xc000, 0x04);
 
-        cpu.registers.B = 0xFF;
+        cpu.registers.B = 0xff;
         cpu.registers.PC = 0xc000;
 
         cpu.executeInstruction();
@@ -358,14 +358,14 @@ describe("CPU - Decode Instructions", () => {
         expect(cpu.getFlag("Z")).toBe(true);
         expect(cpu.getFlag("N")).toBe(false);
         expect(cpu.getFlag("H")).toBe(true);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(4);
       });
     });
 
     describe("INC 16-bit register", () => {
       test("INC register BC by 1", () => {
-        memory.writeByte(0xC000, 0x03);
+        memory.writeByte(0xc000, 0x03);
 
         cpu.registers.B = 0x55;
         cpu.registers.C = 0x90;
@@ -375,28 +375,27 @@ describe("CPU - Decode Instructions", () => {
 
         expect(cpu.registers.B).toBe(0x55);
         expect(cpu.registers.C).toBe(0x91);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(8);
       });
     });
 
     describe("INC 16-bit register", () => {
       test("INC register BC by 1, with a carry over", () => {
-        memory.writeByte(0xC000, 0x03);
+        memory.writeByte(0xc000, 0x03);
 
         cpu.registers.B = 0x55;
-        cpu.registers.C = 0xFF;
+        cpu.registers.C = 0xff;
         cpu.registers.PC = 0xc000;
 
         cpu.executeInstruction();
 
         expect(cpu.registers.B).toBe(0x56);
         expect(cpu.registers.C).toBe(0x00);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(8);
       });
     });
-
   }),
   describe("CPU - DEC Instructions", () => {
     let cpu;
@@ -410,7 +409,7 @@ describe("CPU - Decode Instructions", () => {
 
     describe("DEC 8-bit register", () => {
       test("DEC register B by 1", () => {
-        memory.writeByte(0xC000, 0x05);
+        memory.writeByte(0xc000, 0x05);
 
         cpu.registers.B = 0x42;
         cpu.registers.PC = 0xc000;
@@ -421,32 +420,32 @@ describe("CPU - Decode Instructions", () => {
         expect(cpu.getFlag("Z")).toBe(false);
         expect(cpu.getFlag("N")).toBe(true);
         expect(cpu.getFlag("H")).toBe(false);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(4);
       });
     });
 
     describe("DEC 8-bit register", () => {
       test("DEC register B by 1, half carry flag true", () => {
-        memory.writeByte(0xC000, 0x05);
+        memory.writeByte(0xc000, 0x05);
 
         cpu.registers.B = 0x00;
         cpu.registers.PC = 0xc000;
 
         cpu.executeInstruction();
 
-        expect(cpu.registers.B).toBe(0xFF);
+        expect(cpu.registers.B).toBe(0xff);
         expect(cpu.getFlag("Z")).toBe(false);
         expect(cpu.getFlag("N")).toBe(true);
         expect(cpu.getFlag("H")).toBe(true);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(4);
       });
     });
 
     describe("DEC 16-bit register", () => {
       test("DEC register BC by 1", () => {
-        memory.writeByte(0xC000, 0x0B);
+        memory.writeByte(0xc000, 0x0b);
 
         cpu.registers.B = 0x55;
         cpu.registers.C = 0x90;
@@ -455,15 +454,15 @@ describe("CPU - Decode Instructions", () => {
         cpu.executeInstruction();
 
         expect(cpu.registers.B).toBe(0x55);
-        expect(cpu.registers.C).toBe(0x8F);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.C).toBe(0x8f);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(8);
       });
     });
 
     describe("DEC 16-bit register", () => {
       test("DEC register BC by 1, with a carry over", () => {
-        memory.writeByte(0xC000, 0x0B);
+        memory.writeByte(0xc000, 0x0b);
 
         cpu.registers.B = 0x55;
         cpu.registers.C = 0x00;
@@ -472,8 +471,8 @@ describe("CPU - Decode Instructions", () => {
         cpu.executeInstruction();
 
         expect(cpu.registers.B).toBe(0x54);
-        expect(cpu.registers.C).toBe(0xFF);
-        expect(cpu.registers.PC).toBe(0xC001);
+        expect(cpu.registers.C).toBe(0xff);
+        expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(8);
       });
     });
@@ -519,11 +518,115 @@ describe("CPU - Decode Instructions", () => {
 
         cpu.executeInstruction();
 
-        expect(cpu.registers.A).toBe(0xF6);
+        expect(cpu.registers.A).toBe(0xf6);
         expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
         expect(cpu.getFlag("N")).toBe(true); // Subtract flag should be reset
         expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
         expect(cpu.getFlag("C")).toBe(true); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc001);
+        expect(cpu.clock).toBe(8);
+      });
+    });
+  }),
+  describe("CPU - AND Instructions", () => {
+    let cpu;
+    let memory;
+
+    beforeEach(() => {
+      memory = new Memory();
+      cpu = new CPU(memory);
+      cpu.reset(); // Reset CPU state before each test
+    });
+
+    describe("AND Bitwise Operation", () => {
+      test("AND A, n8 should set A to the bitwise AND between the value in n8 and A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc001, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xe6);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x28);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(true); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(false); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc002);
+        expect(cpu.clock).toBe(8);
+      });
+    });
+
+    describe("AND Bitwise Operation", () => {
+      test("AND A, HL should set A to the bitwise AND between the value in HL and A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.H = 0xc3;
+        cpu.registers.L = 0x62;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc362, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xa6);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x28);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(true); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(false); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc001);
+        expect(cpu.clock).toBe(8);
+      });
+    });
+  }),
+  describe("CPU - AND Instructions", () => {
+    let cpu;
+    let memory;
+
+    beforeEach(() => {
+      memory = new Memory();
+      cpu = new CPU(memory);
+      cpu.reset(); // Reset CPU state before each test
+    });
+
+    describe("OR Bitwise Operation", () => {
+      test("OR A, n8 should set A to the bitwise OR between the value in n8 and A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc001, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xF6);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x7B);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(false); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc002);
+        expect(cpu.clock).toBe(8);
+      });
+    });
+
+    describe("OR Bitwise Operation", () => {
+      test("AND A, HL should set A to the bitwise OR between the value in HL and A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.H = 0xc3;
+        cpu.registers.L = 0x62;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc362, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xB6);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x7B);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(false); // Carry flag should be set
         expect(cpu.registers.PC).toBe(0xc001);
         expect(cpu.clock).toBe(8);
       });
