@@ -336,7 +336,6 @@ export class CPU {
             this.registers.H = (result >> 8) & 0xff;
             this.registers.L = result & 0xff;
 
-            this.setFlag("Z", false); // Zero flag
             this.setFlag("N", false); // Subtract flag
             this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
             this.setFlag("C", hl + value > 0xffff); // Carry flag
@@ -349,8 +348,7 @@ export class CPU {
             this.registers.H = (result >> 8) & 0xff;
             this.registers.L = result & 0xff;
 
-            this.setFlag("Z", false); // Zero flag
-            this.setFlag("N", false); // Subtract flag
+            this.setFlag("N", 0); // Subtract flag
             this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
             this.setFlag("C", hl + value > 0xffff); // Carry flag
             break;
@@ -362,7 +360,6 @@ export class CPU {
             this.registers.H = (result >> 8) & 0xff;
             this.registers.L = result & 0xff;
 
-            this.setFlag("Z", false); // Zero flag
             this.setFlag("N", false); // Subtract flag
             this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
             this.setFlag("C", hl + value > 0xffff); // Carry flag
@@ -375,7 +372,6 @@ export class CPU {
             this.registers.H = (result >> 8) & 0xff;
             this.registers.L = result & 0xff;
 
-            this.setFlag("Z", false); // Zero flag
             this.setFlag("N", false); // Subtract flag
             this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
             this.setFlag("C", hl + value > 0xffff); // Carry flag
@@ -388,7 +384,6 @@ export class CPU {
             this.registers.H = (result >> 8) & 0xff;
             this.registers.L = result & 0xff;
 
-            this.setFlag("Z", false); // Zero flag
             this.setFlag("N", false); // Subtract flag
             this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
             this.setFlag("C", hl + value > 0xffff); // Carry flag
@@ -434,7 +429,7 @@ export class CPU {
             const result = (this.registers.A + value) & 0xff;
 
             this.setFlag("Z", result === 0); // Zero flag
-            this.setFlag("N", true); // Subtract flag
+            this.setFlag("N", false); // Subtract flag
             this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
             this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
             this.registers.A = result;
