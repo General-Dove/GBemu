@@ -2,7 +2,7 @@ import opcodes from "./opcodes.json" with { type: "json" };
 import { Memory } from "./memory.js";
 
 export class CPU {
-  constructor(rom) {
+  constructor(memory) {
     // Registers
     this.registers = {
       A: 0x00, // Accumulator
@@ -19,21 +19,21 @@ export class CPU {
 
     this.clock = 0;
 
-    this.rom = rom;
+    this.memory = memory;
   }
 
   reset() {
     // Reset registers and clock
     this.registers = {
       A: 0x01,
-      F: 0xb0,
+      F: 0xB0,
       B: 0x00,
       C: 0x13,
       D: 0x00,
-      E: 0xd8,
+      E: 0xD8,
       H: 0x01,
-      L: 0x4d,
-      SP: 0xfffe,
+      L: 0x4D,
+      SP: 0xFFFe,
       PC: 0x0100,
     };
 
@@ -43,7 +43,10 @@ export class CPU {
   // Execute a single instruction
   executeInstruction() {
     // Read opcode from memory at current PC
-    const opcode = this.rom.readByte(this.registers.PC);
+    const opcode = this.memory.readByte(this.registers.PC);
+    
+    
+    
     // Get instruction data from opcodes.json
     const instruction = this.decodeInstruction(opcode);
 
@@ -52,6 +55,7 @@ export class CPU {
     }
 
     // Update PC and clock
+    const oldPC = this.registers.PC;
     this.registers.PC += instruction.bytes;
     this.clock += instruction.cycles[0];
 
@@ -228,6 +232,54 @@ export class CPU {
       case "SRL":
         this.SRL(instruction.operands);
         break;
+      // Illegal insruction
+      case "ILLEGAL_DD":
+        this.ILLEGAL_DD(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_E3":
+        this.ILLEGAL_E3(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_DB":
+        this.ILLEGAL_DB(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_ED":
+        this.ILLEGAL_ED(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_EC":
+        this.ILLEGAL_EC(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_FD":
+        this.ILLEGAL_FD(instruction.operands);
+        break;
+      // Illegal instruction
+      case"ILLEGAL_E4":
+        this.ILLEGAL_E4(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_F4":
+        this.ILLEGAL_F4(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_FC":
+        this.ILLEGAL_FC(instruction.operands);
+        break;
+      // Illegal instruction
+      case "ILLEGAL_EB":
+        this.ILLEGAL_EB(instruction.operands);
+        break;
+      // RETI instruction
+      case "RETI":
+        this.RETI(instruction.operands);
+        break;
+      // LDH instruction
+      case "LDH":
+        this.LDH(instruction.operands);
+        break;
       // Default case, throw error if no instruction
       default:
         throw new Error(`Unimplemented instruction: ${instruction.mnemonic}`);
@@ -278,17 +330,19 @@ export class CPU {
   // Decode instruction from opcodes.json
   decodeInstruction(opcode) {
     let opcodeHex = `0x${opcode.toString(16).toUpperCase().padStart(2, "0")}`;
-    
+    console.log(`Decode opcode: ${opcodeHex}`)
+
     // Decode intstruction from prefixed opcodes
     if (opcodeHex === '0xCB') {
-        const nextByte = this.rom.readByte(this.registers.PC + 1);
-        opcodeHex = `0x${nextByte.toString(16).toUpperCase().padStart(2, "0")}`;
-        return opcodes.cbprefixed[opcodeHex];
+        const nextByte = this.memory.readByte(this.registers.PC + 1);
+        const nextOpcodeHex = `0x${nextByte.toString(16).toUpperCase().padStart(2, "0")}`;
+        return opcodes.cbprefixed[nextOpcodeHex];
     }
     
     return opcodes.unprefixed[opcodeHex];
   }
 
+  // Get address of 16-bit registers
   getAddress(operand) {
     switch (operand.name) {
       case "BC":
@@ -298,7 +352,7 @@ export class CPU {
       case "HL":
         return (this.registers.H << 8) | this.registers.L;
       case "n16":
-        return this.rom.readWord(this.registers.PC - 2);
+        return this.memory.readWord(this.registers.PC - 2);
       default:
         throw new Error(
           `Invalid operand for address calculation: ${operand.name}`
@@ -327,7 +381,7 @@ export class CPU {
           break;
         case "SP":
           if (source.e8) {
-            const e8 = this.rom.readByte(this.registers.PC - 1);
+            const e8 = this.memory.readByte(this.registers.PC - 1);
             const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
             value = (this.registers.SP + signedE8) & 0xffff;
 
@@ -357,7 +411,7 @@ export class CPU {
 
     // Handle SP + e8 operations
     if (dest.name === "SP") {
-      const e8 = this.rom.readByte(this.registers.PC - 1);
+      const e8 = this.memory.readByte(this.registers.PC - 1);
       const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
       const result = (this.registers.SP + signedE8) & 0xffff;
 
@@ -376,11 +430,11 @@ export class CPU {
     // Handle 8-bit operations
     let value;
     if (source.name === "n8") {
-      value = this.rom.readByte(this.registers.PC - 1);
+      value = this.memory.readByte(this.registers.PC - 1);
     } else {
       value = source.immediate
         ? this.registers[source.name]
-        : this.rom.readByte(this.getAddress(source));
+        : this.memory.readByte(this.getAddress(source));
     }
 
     const result = (this.registers[dest.name] + value) & 0xff;
@@ -397,10 +451,12 @@ export class CPU {
   LD(operands) {
     const [dest, source] = operands;
 
-    // Handle 16-bit operations
-      if (source.name === "n16") {
-        const lowByte = this.rom.readByte(this.registers.PC - 2);
-        const highByte = this.rom.readByte(this.registers.PC - 1);
+    switch(source.name) {
+
+      // Handle source 16-bit operations
+      case "n16": 
+        const lowByte = this.memory.readByte(this.registers.PC - 2);
+        const highByte = this.memory.readByte(this.registers.PC - 1);
 
         switch (dest.name) {
           case "BC":
@@ -421,99 +477,385 @@ export class CPU {
           default:
             throw new Error(`Invalid destination for LD n16: ${dest.name}`);
         }
+        break;
 
-      return;
-    }
+      // Handle source 8-bit operations  
+      case "n8": 
+        const value = this.memory.readByte(this.registers.PC - 1);
 
-    // Handle SP special cases
-    if (dest.name === "SP") {
-      if (source.name === "HL") {
-        this.registers.SP = (this.registers.H << 8) | this.registers.L;
-
-        return;
-      }
-    }
-
-    // Handle HL special cases
-    if (dest.name === "HL" && source.name === "SP") {
-      const e8 = this.rom.readByte(this.registers.PC - 1);
-      const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
-      const result = (this.registers.SP + signedE8) & 0xffff;
-
-      this.registers.H = (result >> 8) & 0xff;
-      this.registers.L = result & 0xff;
-
-      this.setFlag("Z", false); // Zero flag
-      this.setFlag("N", false); // Subtract flag
-      this.setFlag("H", (this.registers.SP & 0xf) + (e8 & 0xf) > 0xf); // Half flag
-      this.setFlag("C", (this.registers.SP & 0xff) + (e8 & 0xff) > 0xff); // Carry flag
-
-      return;
-    }
-
-    // Handle 8-bit operations
-    if (source.name === "n8" || dest.name === "n8") {
-      if (source.name === "n8") {
-        const value = this.rom.readByte(this.registers.PC - 1);
         if (dest.immediate) {
           this.registers[dest.name] = value;
         } else {
-          this.rom.writeByte(this.getAddress(dest), value);
+          const address = this.getAddress(dest);
+          this.memory.writeByte(address, value);
+        }
+        break;
+
+      // Handle source register A operations
+      case "A":
+        if (dest.name === "HL") {
+            if (dest.increment) {
+              const address = this.getAddress(dest);
+              this.memory.writeByte(address, this.registers.A);
+
+              const newValue = (address + 1) & 0xffff;
+              this.registers.H = (newValue >> 8) & 0xff;
+              this.registers.L = newValue & 0xff;
+              return;
+            } else if (dest.decrement) {
+              const address = this.getAddress(dest);
+              this.memory.writeByte(address, this.registers.A);
+
+              const newValue = (address - 1) & 0xffff;
+              this.registers.H = (newValue >> 8) & 0xff;
+              this.registers.L = newValue & 0xff;
+              return;
+            } else {
+                const address = this.getAddress(dest);
+                this.memory.writeByte(address, this.registers.A);
+                return;
+              }
+          } else if (dest.name === "DE" || dest.name === "BC") {
+              const address = this.getAddress(dest);
+              this.memory.writeByte(address, this.registers.A);
+              return;
+          } else if (dest.name === "a16") {
+            const lowByteAddress = this.memory.readByte(this.registers.PC - 2)
+            const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+            const address = (highByteAddress << 8 | lowByteAddress);
+            this.memory.writeByte(address, this.registers.A);
+            return;
+          } else {
+            this.registers[dest.name] = this.registers.A;
+            return;
         }
 
+      // Handle source register B operations
+      case "B":
+        if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+          const address = this.getAddress(dest);
+          const value = this.memory.readByte(this.registers.B);
+          this.memory.writeByte(address, value);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.B;
+          return;
+        }
+
+      // Handle source register C operations
+      case "C":
+        if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+          const address = this.getAddress(dest);
+          const value = this.memory.readByte(this.registers.C);
+          this.memory.writeByte(address, value);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.C;
+          return;
+        }
+
+      // Handle source register D operations
+      case "D":
+          if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+          const address = this.getAddress(dest);
+          const value = this.memory.readByte(this.registers.D);
+          this.memory.writeByte(address, value);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.D;
+          return;
+        }
+
+      // Handle source register E operations
+      case "E":
+        if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+          const address = this.getAddress(dest);
+          const value = this.memory.readByte(this.registers.E);
+          this.memory.writeByte(address, value);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.E;
+          return;
+        }
+
+      // Handle source register H operations
+      case "H":
+        if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+          const address = this.getAddress(dest);
+          const value = this.memory.readByte(this.registers.H);
+          this.memory.writeByte(address, value);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.H;
+          return;
+        }
+
+      // Handle source register L operations
+      case "L":
+        if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+          const address = this.getAddress(dest);
+          const value = this.memory.readByte(this.registers.L);
+          this.memory.writeByte(address, value);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.L;
+          return;
+        }
+
+      // Handle source register HL operations
+      case "HL":
+        // Handle SP special cases
+        if (dest.name === "SP") {
+        this.registers.SP = (this.registers.H << 8) | this.registers.L;
         return;
-      } else {
-        const value = this.registers[source.name];
-        this.rom.writeByte(this.getAddress(dest), value);
+        }
 
-        return;
-      }
+        if (source.increment) {
+          const address = (this.registers.H << 8) | this.registers.L;
+          this.registers.A = this.memory.readByte(address);
+
+          const newValue = (address + 1) & 0xffff;
+          this.registers.H = (newValue >> 8) & 0xff;
+          this.registers.L = newValue & 0xff;
+
+          return;
+        }
+
+        if (source.decrement) {
+          const address = (this.registers.H << 8) | this.registers.L;
+          this.registers.A = this.memory.readByte(address);
+
+          const newValue = (address - 1) & 0xffff;
+          this.registers.H = (newValue >> 8) & 0xff;
+          this.registers.L = newValue & 0xff;
+
+          return;
+        }
+        break;
+
+      // Handle source register SP operations
+      case "SP":
+        // Handle HL special cases
+        if (dest.name === "HL") {
+          const e8 = this.memory.readByte(this.registers.PC - 1);
+          const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
+          const result = (this.registers.SP + signedE8) & 0xffff;
+
+          this.registers.H = (result >> 8) & 0xff;
+          this.registers.L = result & 0xff;
+
+          this.setFlag("Z", false); // Zero flag
+          this.setFlag("N", false); // Subtract flag
+          this.setFlag("H", (this.registers.SP & 0xf) + (e8 & 0xf) > 0xf); // Half flag
+          this.setFlag("C", (this.registers.SP & 0xff) + (e8 & 0xff) > 0xff); // Carry flag
+
+          return;
+        } else if (dest.name === "a16") {
+          const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+          const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+          const lowValue = this.registers.SP & 0xFF;
+          const highValue = this.registers.SP >> 8 & 0xFF;
+          this.memory.writeByte(lowByteAddress, lowValue);
+          this.memory.writeByte(highByteAddress, highValue);
+          return;
+        }
+        break;
+
+      default:
+        break;
     }
+  }
 
-    // Handle incremental/decremental cases
-    if (dest.name === "HL" && source.name === "A" && dest.increment) {
-      const address = (this.registers.H << 8) | this.registers.L;
-      this.rom.writeByte(address, this.registers.A);
+  JP(operands) {
 
-      const newValue = (address + 1) & 0xffff;
-      this.registers.H = (newValue >> 8) & 0xff;
-      this.registers.L = newValue & 0xff;
+  }
+  
+  ADC(operands) {
 
-      return;
-    }
+  }
 
-    if (dest.name === "HL" && dest.decrement) {
-      const address = (this.registers.H << 8) | this.registers.L;
-      this.rom.writeByte(address, this.registers.A);
+  CALL(operands) {
 
-      const newValue = (address - 1) & 0xffff;
-      this.registers.H = (newValue >> 8) & 0xff;
-      this.registers.L = newValue & 0xff;
+  }
+  
+  DEC(operands) {
 
-      return;
-    }
+  }
 
-    if (source.name === "HL" && source.increment) {
-      const address = (this.registers.H << 8) | this.registers.L;
-      this.registers.A = this.rom.readByte(address);
+  INC(operands) {
 
-      const newValue = (address + 1) & 0xffff;
-      this.registers.H = (newValue >> 8) & 0xff;
-      this.registers.L = newValue & 0xff;
+  }
 
-      return;
-    }
+  ILLEGAL_DD(operands) {
 
-    if (source.name === "HL" && source.decrement) {
-      const address = (this.registers.H << 8) | this.registers.L;
-      this.registers.A = this.rom.readByte(address);
+  }
 
-      const newValue = (address - 1) & 0xffff;
-      this.registers.H = (newValue >> 8) & 0xff;
-      this.registers.L = newValue & 0xff;
+  RETI(operands) {
 
-      return;
-    }
+  }
+
+  SBC(operands) {
+
+  }
+
+  CP(operands) {
+
+  }
+
+  PUSH(operands) {
+
+  }
+
+  JR(operands) {
+
+  }
+
+  SUB(operands) {
+
+  }
+
+  RRA(operands) {
+
+  }
+
+  RET(operands) {
+
+  }
+
+  OR(operands) {
+
+  }
+
+  POP(operands) {
+
+  }
+
+  LDH(operands) {
+
+  }
+
+  XOR(operands) {
+
+  }
+
+  SRL(operands) {
+
+  }
+
+  RR(operands) {
+
+  }
+
+  SWAP(operands) {
+
+  }
+
+  AND(operands) {
+
+  }
+
+  RST(operands) {
+
+  }
+
+  CPL(operands) {
+
+  }
+
+  DI(operands) {
+
+  }
+
+  BIT(operands) {
+
+  }
+
+  RL(operands) {
+
+  }
+
+  RLCA(operands) {
+
+  }
+
+  STOP(operands) {
+
+  }
+
+  RES(operands) {
+
+  }
+
+  ILLEGAL_E3(operands) {
+
+  }
+
+  RLC(operands) {
+
+  }
+
+  EI(operands) {
+
+  }
+
+  CCF(operands) {
+
+  }
+
+  ILLEGAL_DB(operands) {
+
+  }
+
+  RRCA(operands) {
+
+  }
+
+  ILLEGAL_ED(operands) {
+
+  }
+
+  SCF(operands) {
+
+  }
+
+  ILLEGAL_EC(operands) {
+
+  }
+
+  ILLEGAL_FD(operands) {
+
+  }
+
+  HALT(operands) {
+
+  }
+
+  DAA(operands) {
+
+  }
+
+  RLA(operands) {
+
+  }
+
+  ILLEGAL_E4(operands) {
+
+  }
+
+  SET(operands) {
+
+  }
+
+  ILLEGAL_F4(operands) {
+
+  }
+
+  ILLEGAL_FC(operands) {
+
+  }
+
+  ILLEGAL_EB(operands) {
+
   }
 }
 
