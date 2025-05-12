@@ -683,4 +683,62 @@ describe("CPU - Decode Instructions", () => {
         expect(cpu.clock).toBe(8);
       });
     });
+  }),
+  describe("CPU - XOR Instructions", () => {
+    let cpu;
+    let memory;
+
+    beforeEach(() => {
+      memory = new Memory();
+      cpu = new CPU(memory);
+      cpu.reset(); // Reset CPU state before each test
+    });
+
+    describe("JP(jump) Operation", () => {
+      test("JP HL should set current PC to address of value held by HL", () => {
+        cpu.registers.H = 0xc3;
+        cpu.registers.L = 0x62;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc362, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xE9);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.PC).toBe(0x69);
+        expect(cpu.clock).toBe(4);
+      });
+    });
+
+    describe("JP(jump) Operation", () => {
+      test("JP a16 should set current PC to address of a16", () => {
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc001, 0x69);
+        memory.writeByte(0xc002, 0x45);
+        memory.writeByte(cpu.registers.PC, 0xC3);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.PC).toBe(0x4569);
+        expect(cpu.clock).toBe(16);
+      });
+    });
+
+    describe("JP(jump) Operation", () => {
+      test("JP NZ, a16 should set current PC to address of a16 only if the Z flag is not set", () => {
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc001, 0x69);
+        memory.writeByte(0xc002, 0x45);
+        memory.writeByte(cpu.registers.PC, 0xC2);
+
+        cpu.executeInstruction();
+
+        expect(cpu.getFlag("Z")).toBe(true);
+        expect(cpu.registers.PC).toBe(0xc003);
+        expect(cpu.clock).toBe(12);
+      });
+    });
+
   });

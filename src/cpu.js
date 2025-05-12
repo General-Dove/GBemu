@@ -909,7 +909,80 @@ export class CPU {
     }
   }
 
-  JP(operands) {}
+  JP(operands) {
+    const [source, dest] = operands;
+
+    switch (source.name) {
+      case "NZ": {
+        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+        const address = (highByteAddress << 8) | lowByteAddress;
+
+        if (!this.getFlag("Z")) {
+          this.registers.PC = address;
+        } else {
+          this.clock -= 4;
+        }
+        break;
+      }
+
+      case "a16": {
+        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+        const address = (highByteAddress << 8) | lowByteAddress;
+
+        this.registers.PC = address;
+        break;
+      }
+      
+      case "Z": {
+        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+        const address = (highByteAddress << 8) | lowByteAddress;
+
+        if (this.getFlag("Z")) {
+          this.registers.PC = address;
+        } else {
+          this.clock -= 4;
+        }
+        break;
+      }
+
+      case "NC": {
+        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+        const address = (highByteAddress << 8) | lowByteAddress;
+
+        if (!this.getFlag("C")) {
+          this.registers.PC = address;
+        } else {
+          this.clock -= 4;
+        }
+        break;
+      }
+
+      case "C": {
+        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+        const address = (highByteAddress << 8) | lowByteAddress;
+
+        if (this.getFlag("C")) {
+          this.registers.PC = address;
+        } else {
+          this.clock -= 4;
+        }
+        break;
+      }
+
+      case "HL": {
+        const address = this.getAddress(source);
+        const value = this.memory.readByte(address);
+
+        this.registers.PC = value;
+        break;
+      }
+    }
+  }
 
   ADC(operands) {}
 
