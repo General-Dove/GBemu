@@ -477,5 +477,55 @@ describe("CPU - Decode Instructions", () => {
         expect(cpu.clock).toBe(8);
       });
     });
+  }),
+  describe("CPU - SUB Instructions", () => {
+    let cpu;
+    let memory;
 
+    beforeEach(() => {
+      memory = new Memory();
+      cpu = new CPU(memory);
+      cpu.reset(); // Reset CPU state before each test
+    });
+
+    describe("SUB 8-bit Operation", () => {
+      test("SUB A, B should subtract register B from A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.B = 0xc6;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(cpu.registers.PC, 0x90);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x74);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(true); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(true); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc001);
+        expect(cpu.clock).toBe(4);
+      });
+    });
+
+    describe("SUB 8-bit Operation", () => {
+      test("SUB A, HL should subtract register HL from A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.H = 0xc6;
+        cpu.registers.L = 0x44;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(cpu.registers.PC, 0x96);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0xF6);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(true); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(true); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc001);
+        expect(cpu.clock).toBe(8);
+      });
+    });
   });

@@ -329,6 +329,19 @@ export class CPU {
     switch (dest.name) {
       case "HL": {
         switch (source.name) {
+          case "HL": {
+            const hl = (this.registers.H << 8) | this.registers.L;
+            const value = (this.registers.H << 8) | this.registers.L;
+            let result = (hl + value) & 0xffff;
+            this.registers.H = (result >> 8) & 0xff;
+            this.registers.L = result & 0xff;
+
+            this.setFlag("Z", false); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
+            this.setFlag("C", hl + value > 0xffff); // Carry flag
+            break;
+          }
           case "BC": {
             const hl = (this.registers.H << 8) | this.registers.L;
             const value = (this.registers.B << 8) | this.registers.C;
@@ -411,6 +424,17 @@ export class CPU {
 
             this.setFlag("Z", result === 0); // Zero flag
             this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+          case "A": {
+            const value = this.registers.A;
+            const result = (this.registers.A + value) & 0xff;
+
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", true); // Subtract flag
             this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
             this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
             this.registers.A = result;
@@ -722,28 +746,28 @@ export class CPU {
     switch (source.name) {
       // Handle 16-bit operations
       case "BC": {
-        this.registers.C = (this.registers.C + 1) & 0xFF;
+        this.registers.C = (this.registers.C + 1) & 0xff;
         if (this.registers.C === 0) {
-          this.registers.B = (this.registers.B + 1) & 0xFF;
+          this.registers.B = (this.registers.B + 1) & 0xff;
         }
         break;
       }
       case "DE": {
-        this.registers.E = (this.registers.E + 1) & 0xFF;
+        this.registers.E = (this.registers.E + 1) & 0xff;
         if (this.registers.E === 0) {
-          this.registers.D = (this.registers.D + 1) & 0xFF;
+          this.registers.D = (this.registers.D + 1) & 0xff;
         }
         break;
       }
       case "HL": {
-        this.registers.L = (this.registers.L + 1) & 0xFF;
+        this.registers.L = (this.registers.L + 1) & 0xff;
         if (this.registers.L === 0) {
-          this.registers.H = (this.registers.H + 1) & 0xFF;
+          this.registers.H = (this.registers.H + 1) & 0xff;
         }
         break;
       }
       case "SP": {
-        this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+        this.registers.SP = (this.registers.SP + 1) & 0xffff;
         break;
       }
       // Handle 8-bit operations
@@ -810,28 +834,28 @@ export class CPU {
     switch (source.name) {
       // Handle 16-bit operations
       case "BC": {
-        this.registers.C = (this.registers.C - 1) & 0xFF;
-        if (this.registers.C === 0xFF) {
-          this.registers.B = (this.registers.B - 1) & 0xFF;
+        this.registers.C = (this.registers.C - 1) & 0xff;
+        if (this.registers.C === 0xff) {
+          this.registers.B = (this.registers.B - 1) & 0xff;
         }
         break;
       }
       case "DE": {
-        this.registers.E = (this.registers.E - 1) & 0xFF;
-        if (this.registers.E === 0xFF) {
-          this.registers.D = (this.registers.D - 1) & 0xFF;
+        this.registers.E = (this.registers.E - 1) & 0xff;
+        if (this.registers.E === 0xff) {
+          this.registers.D = (this.registers.D - 1) & 0xff;
         }
         break;
       }
       case "HL": {
-        this.registers.L = (this.registers.L - 1) & 0xFF;
-        if (this.registers.L === 0xFF) {
-          this.registers.H = (this.registers.H - 1) & 0xFF;
+        this.registers.L = (this.registers.L - 1) & 0xff;
+        if (this.registers.L === 0xff) {
+          this.registers.H = (this.registers.H - 1) & 0xff;
         }
         break;
       }
       case "SP": {
-        this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+        this.registers.SP = (this.registers.SP - 1) & 0xffff;
         break;
       }
       // Handle 8-bit operations
@@ -850,7 +874,7 @@ export class CPU {
 
         this.setFlag("Z", this.registers.C === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
-        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        this.setFlag("H", (oldValue & 0xf) === 0x00); // Half flag
         break;
       }
       case "D": {
@@ -859,7 +883,7 @@ export class CPU {
 
         this.setFlag("Z", this.registers.D === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
-        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        this.setFlag("H", (oldValue & 0xf) === 0x00); // Half flag
         break;
       }
       case "E": {
@@ -868,7 +892,7 @@ export class CPU {
 
         this.setFlag("Z", this.registers.E === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
-        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        this.setFlag("H", (oldValue & 0xf) === 0x00); // Half flag
         break;
       }
       case "H": {
@@ -877,7 +901,7 @@ export class CPU {
 
         this.setFlag("Z", this.registers.H === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
-        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        this.setFlag("H", (oldValue & 0xf) === 0x00); // Half flag
         break;
       }
       case "L": {
@@ -886,7 +910,7 @@ export class CPU {
 
         this.setFlag("Z", this.registers.L === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
-        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        this.setFlag("H", (oldValue & 0xf) === 0x00); // Half flag
         break;
       }
     }
@@ -908,7 +932,120 @@ export class CPU {
 
   JR(operands) {}
 
-  SUB(operands) {}
+  // SUB (subtract) instructions
+  SUB(operands) {
+    const [dest, source] = operands;
+
+    switch (source.name) {
+      case "n8": {
+        const value = this.memory.readByte(this.registers.PC - 1);
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "A": {
+        const value = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (value & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "B": {
+        const value = this.registers.B;
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "C": {
+        const value = this.registers.C;
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "D": {
+        const value = this.registers.D;
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "E": {
+        const value = this.registers.E;
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "H": {
+        const value = this.registers.H;
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "L": {
+        const value = this.registers.L;
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "HL": {
+        const value = this.getAddress(source);
+        const oldValue = this.registers.A;
+        const result = (this.registers.A - value) & 0xff;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) < (value & 0xf)); // Half flag
+        this.setFlag("C", value > this.registers.A); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+    }
+  }
 
   RRA(operands) {}
 
