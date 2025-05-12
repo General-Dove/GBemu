@@ -1155,7 +1155,112 @@ export class CPU {
 
   LDH(operands) {}
 
-  XOR(operands) {}
+  XOR(operands) {
+    const [dest, source] = operands;
+
+    switch (source.name) {
+      case "n8": {
+        const value = this.memory.readByte(this.registers.PC - 1);
+        const result = this.registers.A ^ value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "A": {
+        const value = this.registers.A;
+        const result = this.registers.A ^ value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+      case "B": {
+        const value = this.registers.B;
+        const result = this.registers.A ^ value;
+
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "C": {
+        const value = this.registers.C;
+        const result = this.registers.A ^ value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "D": {
+        const value = this.registers.D;
+        const result = this.registers.A ^ value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "E": {
+        const value = this.registers.E;
+        const result = this.registers.A ^ value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "H": {
+        const value = this.registers.H;
+        const result = this.registers.A ^ value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "L": {
+        const value = this.registers.L;
+        const result = this.registers.A ^ value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+
+      case "HL": {
+        const address = this.getAddress(source);
+        const value = this.memory.readByte(address);
+        const result = this.registers.A ^ value;
+        this.setFlag("Z", result === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", false); // Half flag
+        this.setFlag("C", false); // Carry flag
+        this.registers.A = result;
+        break;
+      }
+    }
+  }
 
   SRL(operands) {}
 
@@ -1303,6 +1408,8 @@ export class CPU {
   RLA(operands) {}
 
   SET(operands) {}
+
+  RRC(operands) {}
 }
 
 export default CPU;

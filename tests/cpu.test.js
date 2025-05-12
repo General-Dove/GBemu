@@ -580,7 +580,7 @@ describe("CPU - Decode Instructions", () => {
       });
     });
   }),
-  describe("CPU - AND Instructions", () => {
+  describe("CPU - OR Instructions", () => {
     let cpu;
     let memory;
 
@@ -611,7 +611,7 @@ describe("CPU - Decode Instructions", () => {
     });
 
     describe("OR Bitwise Operation", () => {
-      test("AND A, HL should set A to the bitwise OR between the value in HL and A", () => {
+      test("OR A, HL should set A to the bitwise OR between the value in HL and A", () => {
         cpu.registers.A = 0x3a;
         cpu.registers.H = 0xc3;
         cpu.registers.L = 0x62;
@@ -623,6 +623,58 @@ describe("CPU - Decode Instructions", () => {
         cpu.executeInstruction();
 
         expect(cpu.registers.A).toBe(0x7B);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(false); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc001);
+        expect(cpu.clock).toBe(8);
+      });
+    });
+  }),
+  describe("CPU - XOR Instructions", () => {
+    let cpu;
+    let memory;
+
+    beforeEach(() => {
+      memory = new Memory();
+      cpu = new CPU(memory);
+      cpu.reset(); // Reset CPU state before each test
+    });
+
+    describe("XOR Bitwise Operation", () => {
+      test("XOR A, n8 should set A to the bitwise XOR between the value in n8 and A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc001, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xEE);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x53);
+        expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
+        expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
+        expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
+        expect(cpu.getFlag("C")).toBe(false); // Carry flag should be set
+        expect(cpu.registers.PC).toBe(0xc002);
+        expect(cpu.clock).toBe(8);
+      });
+    });
+
+    describe("XOR Bitwise Operation", () => {
+      test("XOR A, HL should set A to the bitwise XOR between the value in HL and A", () => {
+        cpu.registers.A = 0x3a;
+        cpu.registers.H = 0xc3;
+        cpu.registers.L = 0x62;
+        cpu.registers.PC = 0xc000;
+
+        memory.writeByte(0xc362, 0x69);
+        memory.writeByte(cpu.registers.PC, 0xAE);
+
+        cpu.executeInstruction();
+
+        expect(cpu.registers.A).toBe(0x53);
         expect(cpu.getFlag("Z")).toBe(false); // Zero flag should be set
         expect(cpu.getFlag("N")).toBe(false); // Subtract flag should be reset
         expect(cpu.getFlag("H")).toBe(false); // Half carry flag should be set
