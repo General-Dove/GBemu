@@ -1,4 +1,4 @@
-import opcodes from "./opcodes.json" with { type: "json" };
+import opcodes from "./opcodes.json";
 import { Memory } from "./memory.js";
 
 export class CPU {
@@ -26,14 +26,14 @@ export class CPU {
     // Reset registers and clock
     this.registers = {
       A: 0x01,
-      F: 0xB0,
+      F: 0xb0,
       B: 0x00,
       C: 0x13,
       D: 0x00,
-      E: 0xD8,
+      E: 0xd8,
       H: 0x01,
-      L: 0x4D,
-      SP: 0xFFFe,
+      L: 0x4d,
+      SP: 0xfffe,
       PC: 0x0100,
     };
 
@@ -44,9 +44,7 @@ export class CPU {
   executeInstruction() {
     // Read opcode from memory at current PC
     const opcode = this.memory.readByte(this.registers.PC);
-    
-    
-    
+
     // Get instruction data from opcodes.json
     const instruction = this.decodeInstruction(opcode);
 
@@ -232,46 +230,6 @@ export class CPU {
       case "SRL":
         this.SRL(instruction.operands);
         break;
-      // Illegal insruction
-      case "ILLEGAL_DD":
-        this.ILLEGAL_DD(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_E3":
-        this.ILLEGAL_E3(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_DB":
-        this.ILLEGAL_DB(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_ED":
-        this.ILLEGAL_ED(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_EC":
-        this.ILLEGAL_EC(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_FD":
-        this.ILLEGAL_FD(instruction.operands);
-        break;
-      // Illegal instruction
-      case"ILLEGAL_E4":
-        this.ILLEGAL_E4(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_F4":
-        this.ILLEGAL_F4(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_FC":
-        this.ILLEGAL_FC(instruction.operands);
-        break;
-      // Illegal instruction
-      case "ILLEGAL_EB":
-        this.ILLEGAL_EB(instruction.operands);
-        break;
       // RETI instruction
       case "RETI":
         this.RETI(instruction.operands);
@@ -330,15 +288,18 @@ export class CPU {
   // Decode instruction from opcodes.json
   decodeInstruction(opcode) {
     let opcodeHex = `0x${opcode.toString(16).toUpperCase().padStart(2, "0")}`;
-    console.log(`Decode opcode: ${opcodeHex}`)
+    console.log(`Decode opcode: ${opcodeHex}`);
 
     // Decode intstruction from prefixed opcodes
-    if (opcodeHex === '0xCB') {
-        const nextByte = this.memory.readByte(this.registers.PC + 1);
-        const nextOpcodeHex = `0x${nextByte.toString(16).toUpperCase().padStart(2, "0")}`;
-        return opcodes.cbprefixed[nextOpcodeHex];
+    if (opcodeHex === "0xCB") {
+      const nextByte = this.memory.readByte(this.registers.PC + 1);
+      const nextOpcodeHex = `0x${nextByte
+        .toString(16)
+        .toUpperCase()
+        .padStart(2, "0")}`;
+      return opcodes.cbprefixed[nextOpcodeHex];
     }
-    
+
     return opcodes.unprefixed[opcodeHex];
   }
 
@@ -352,7 +313,7 @@ export class CPU {
       case "HL":
         return (this.registers.H << 8) | this.registers.L;
       case "n16":
-        return this.memory.readWord(this.registers.PC - 2);
+        return this.memory.readByte(this.registers.PC - 2);
       default:
         throw new Error(
           `Invalid operand for address calculation: ${operand.name}`
@@ -365,96 +326,186 @@ export class CPU {
     const [dest, source] = operands;
 
     // Handle 16-bit operations
-    if (dest.name === "HL") {
-      const hl = (this.registers.H << 8) | this.registers.L;
-      let value;
-
-      switch (source.name) {
-        case "BC":
-          value = (this.registers.B << 8) | this.registers.C;
-          break;
-        case "DE":
-          value = (this.registers.D << 8) | this.registers.E;
-          break;
-        case "HL":
-          value = (this.registers.H << 8) | this.registers.L;
-          break;
-        case "SP":
-          if (source.e8) {
-            const e8 = this.memory.readByte(this.registers.PC - 1);
-            const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
-            value = (this.registers.SP + signedE8) & 0xffff;
+    switch (dest.name) {
+      case "HL": {
+        switch (source.name) {
+          case "BC": {
+            const hl = (this.registers.H << 8) | this.registers.L;
+            const value = (this.registers.B << 8) | this.registers.C;
+            let result = (hl + value) & 0xffff;
+            this.registers.H = (result >> 8) & 0xff;
+            this.registers.L = result & 0xff;
 
             this.setFlag("Z", false); // Zero flag
             this.setFlag("N", false); // Subtract flag
-            this.setFlag("H", (this.registers.SP & 0xf) + (e8 & 0xf) > 0xf); // Half flag
-            this.setFlag("C", (this.registers.SP & 0xff) + (e8 & 0xff) > 0xff); // Carry flag
-          } else {
-            value = this.registers.SP;
+            this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
+            this.setFlag("C", hl + value > 0xffff); // Carry flag
+            break;
           }
-          break;
-        default:
-          throw new Error(`Invalid source for ADD HL: ${source.name}`);
+          case "DE": {
+            const hl = (this.registers.H << 8) | this.registers.L;
+            const value = (this.registers.D << 8) | this.registers.E;
+            let result = (hl + value) & 0xffff;
+            this.registers.H = (result >> 8) & 0xff;
+            this.registers.L = result & 0xff;
+
+            this.setFlag("Z", false); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
+            this.setFlag("C", hl + value > 0xffff); // Carry flag
+            break;
+          }
+          case "HL": {
+            const hl = (this.registers.H << 8) | this.registers.L;
+            const value = (this.registers.H << 8) | this.registers.L;
+            let result = (hl + value) & 0xffff;
+            this.registers.H = (result >> 8) & 0xff;
+            this.registers.L = result & 0xff;
+
+            this.setFlag("Z", false); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
+            this.setFlag("C", hl + value > 0xffff); // Carry flag
+            break;
+          }
+          case "SP": {
+            const hl = (this.registers.H << 8) | this.registers.L;
+            const value = this.registers.SP;
+            let result = (hl + value) & 0xffff;
+            this.registers.H = (result >> 8) & 0xff;
+            this.registers.L = result & 0xff;
+
+            this.setFlag("Z", false); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
+            this.setFlag("C", hl + value > 0xffff); // Carry flag
+            break;
+          }
+          default:
+            throw new Error(`Invalid source for ADD HL: ${source.name}`);
+        }
+        break;
       }
 
-      const result = (hl + value) & 0xffff;
-      this.registers.H = (result >> 8) & 0xff;
-      this.registers.L = result & 0xff;
+      // Handle SP + e8 operations
+      case "SP": {
+        const e8 = this.memory.readByte(this.registers.PC - 1);
+        const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
+        const result = (this.registers.SP + signedE8) & 0xffff;
 
-      this.setFlag("Z", false); // Zero flag
-      this.setFlag("N", false); // Subtract flag
-      this.setFlag("H", (hl & 0xfff) + (value & 0xfff) > 0xfff); // Half flag
-      this.setFlag("C", hl + value > 0xffff); // Carry flag
+        this.setFlag("Z", false); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (this.registers.SP & 0xf) + (e8 & 0xf) > 0xf); // Half flag
+        this.setFlag("C", (this.registers.SP & 0xff) + (e8 & 0xff) > 0xff); // Carry flag
 
-      return;
+        this.registers.SP = result;
+        break;
+      }
+
+      // Handle 8-bit operations
+      case "A": {
+        switch (source.name) {
+          case "n8": {
+            const value = this.memory.readByte(this.registers.PC - 1);
+            const result = (this.registers.A + value) & 0xff;
+
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+          case "B": {
+            const value = this.registers.B;
+            const result = (this.registers.A + value) & 0xff;
+
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+
+          case "C": {
+            const value = this.registers.C;
+            const result = (this.registers.A + value) & 0xff;
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+
+          case "D": {
+            const value = this.registers.D;
+            const result = (this.registers.A + value) & 0xff;
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+
+          case "E": {
+            const value = this.registers.E;
+            const result = (this.registers.A + value) & 0xff;
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+
+          case "H": {
+            const value = this.registers.H;
+            const result = (this.registers.A + value) & 0xff;
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+
+          case "L": {
+            const value = this.registers.L;
+            const result = (this.registers.A + value) & 0xff;
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+
+          case "HL": {
+            const value = this.getAddress(source);
+            const result = (this.registers.A + value) & 0xff;
+            this.setFlag("Z", result === 0); // Zero flag
+            this.setFlag("N", false); // Subtract flag
+            this.setFlag("H", (this.registers.A & 0xf) + (value & 0xf) > 0xf); // Half flag
+            this.setFlag("C", this.registers.A + value > 0xff); // Carry flag
+            this.registers.A = result;
+            break;
+          }
+        }
+        break;
+      }
     }
-
-    // Handle SP + e8 operations
-    if (dest.name === "SP") {
-      const e8 = this.memory.readByte(this.registers.PC - 1);
-      const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
-      const result = (this.registers.SP + signedE8) & 0xffff;
-
-      this.setFlag("Z", false); // Zero flag
-      this.setFlag("N", false); // Subtract flag
-      this.setFlag("H", (this.registers.SP & 0xf) + (e8 & 0xf) > 0xf); // Half flag
-      this.setFlag("C", (this.registers.SP & 0xff) + (e8 & 0xff) > 0xff); // Carry flag
-
-      this.registers.SP = result;
-      return;
-    }
-
-    if (dest.name !== "A") {
-      throw new Error("8-bit ADD operations are only supported for register A");
-    }
-    // Handle 8-bit operations
-    let value;
-    if (source.name === "n8") {
-      value = this.memory.readByte(this.registers.PC - 1);
-    } else {
-      value = source.immediate
-        ? this.registers[source.name]
-        : this.memory.readByte(this.getAddress(source));
-    }
-
-    const result = (this.registers[dest.name] + value) & 0xff;
-
-    this.setFlag("Z", result === 0); // Zero flag
-    this.setFlag("N", false); // Subtract flag
-    this.setFlag("H", (this.registers[dest.name] & 0xf) + (value & 0xf) > 0xf); // Half flag
-    this.setFlag("C", this.registers[dest.name] + value > 0xff); // Carry flag
-
-    this.registers[dest.name] = result;
   }
 
   // Load instructions
   LD(operands) {
     const [dest, source] = operands;
 
-    switch(source.name) {
-
+    switch (source.name) {
       // Handle source 16-bit operations
-      case "n16": 
+      case "n16":
         const lowByte = this.memory.readByte(this.registers.PC - 2);
         const highByte = this.memory.readByte(this.registers.PC - 1);
 
@@ -472,15 +523,15 @@ export class CPU {
             this.registers.L = lowByte;
             break;
           case "SP":
-            this.registers.SP = (highByte << 8 | lowByte);
+            this.registers.SP = (highByte << 8) | lowByte;
             break;
           default:
             throw new Error(`Invalid destination for LD n16: ${dest.name}`);
         }
         break;
 
-      // Handle source 8-bit operations  
-      case "n8": 
+      // Handle source 8-bit operations
+      case "n8":
         const value = this.memory.readByte(this.registers.PC - 1);
 
         if (dest.immediate) {
@@ -494,40 +545,40 @@ export class CPU {
       // Handle source register A operations
       case "A":
         if (dest.name === "HL") {
-            if (dest.increment) {
-              const address = this.getAddress(dest);
-              this.memory.writeByte(address, this.registers.A);
-
-              const newValue = (address + 1) & 0xffff;
-              this.registers.H = (newValue >> 8) & 0xff;
-              this.registers.L = newValue & 0xff;
-              return;
-            } else if (dest.decrement) {
-              const address = this.getAddress(dest);
-              this.memory.writeByte(address, this.registers.A);
-
-              const newValue = (address - 1) & 0xffff;
-              this.registers.H = (newValue >> 8) & 0xff;
-              this.registers.L = newValue & 0xff;
-              return;
-            } else {
-                const address = this.getAddress(dest);
-                this.memory.writeByte(address, this.registers.A);
-                return;
-              }
-          } else if (dest.name === "DE" || dest.name === "BC") {
-              const address = this.getAddress(dest);
-              this.memory.writeByte(address, this.registers.A);
-              return;
-          } else if (dest.name === "a16") {
-            const lowByteAddress = this.memory.readByte(this.registers.PC - 2)
-            const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-            const address = (highByteAddress << 8 | lowByteAddress);
+          if (dest.increment) {
+            const address = this.getAddress(dest);
             this.memory.writeByte(address, this.registers.A);
+
+            const newValue = (address + 1) & 0xffff;
+            this.registers.H = (newValue >> 8) & 0xff;
+            this.registers.L = newValue & 0xff;
+            return;
+          } else if (dest.decrement) {
+            const address = this.getAddress(dest);
+            this.memory.writeByte(address, this.registers.A);
+
+            const newValue = (address - 1) & 0xffff;
+            this.registers.H = (newValue >> 8) & 0xff;
+            this.registers.L = newValue & 0xff;
             return;
           } else {
-            this.registers[dest.name] = this.registers.A;
+            const address = this.getAddress(dest);
+            this.memory.writeByte(address, this.registers.A);
             return;
+          }
+        } else if (dest.name === "DE" || dest.name === "BC") {
+          const address = this.getAddress(dest);
+          this.memory.writeByte(address, this.registers.A);
+          return;
+        } else if (dest.name === "a16") {
+          const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
+          const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+          const address = (highByteAddress << 8) | lowByteAddress;
+          this.memory.writeByte(address, this.registers.A);
+          return;
+        } else {
+          this.registers[dest.name] = this.registers.A;
+          return;
         }
 
       // Handle source register B operations
@@ -556,7 +607,7 @@ export class CPU {
 
       // Handle source register D operations
       case "D":
-          if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
+        if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
           const value = this.memory.readByte(this.registers.D);
           this.memory.writeByte(address, value);
@@ -606,8 +657,8 @@ export class CPU {
       case "HL":
         // Handle SP special cases
         if (dest.name === "SP") {
-        this.registers.SP = (this.registers.H << 8) | this.registers.L;
-        return;
+          this.registers.SP = (this.registers.H << 8) | this.registers.L;
+          return;
         }
 
         if (source.increment) {
@@ -653,10 +704,9 @@ export class CPU {
         } else if (dest.name === "a16") {
           const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
           const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-          const lowValue = this.registers.SP & 0xFF;
-          const highValue = this.registers.SP >> 8 & 0xFF;
-          this.memory.writeByte(lowByteAddress, lowValue);
-          this.memory.writeByte(highByteAddress, highValue);
+          const address = (highByteAddress << 8) | lowByteAddress;
+          this.memory.writeByte(address, this.registers.SP & 0xff);
+          this.memory.writeByte(address + 1, (this.registers.SP >> 8) & 0xff);
           return;
         }
         break;
@@ -666,197 +716,253 @@ export class CPU {
     }
   }
 
-  JP(operands) {
-
-  }
-  
-  ADC(operands) {
-
-  }
-
-  CALL(operands) {
-
-  }
-  
-  DEC(operands) {
-
-  }
-
+  // INC (increment) instructions
   INC(operands) {
+    const source = operands;
+    switch (source.name) {
+      // Handle 16-bit operations
+      case "BC": {
+        this.registers.C = (this.registers.C + 1) & 0xFF;
+        if (this.registers.C === 0) {
+          this.registers.B = (this.registers.B + 1) & 0xFF;
+        }
+        break;
+      }
+      case "DE": {
+        this.registers.E = (this.registers.E + 1) & 0xFF;
+        if (this.registers.E === 0) {
+          this.registers.D = (this.registers.D + 1) & 0xFF;
+        }
+        break;
+      }
+      case "HL": {
+        this.registers.L = (this.registers.L + 1) & 0xFF;
+        if (this.registers.L === 0) {
+          this.registers.H = (this.registers.H + 1) & 0xFF;
+        }
+        break;
+      }
+      case "SP": {
+        this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+        break;
+      }
+      // Handle 8-bit operations
+      case "B": {
+        const oldValue = this.registers.B;
+        this.registers.B = (this.registers.B + 1) & 0xff;
 
+        this.setFlag("Z", this.registers.B === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "C": {
+        const oldValue = this.registers.C;
+        this.registers.C += 1 & 0xff;
+
+        this.setFlag("Z", this.registers.C === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "D": {
+        const oldValue = this.registers.D;
+        this.registers.D += 1 & 0xff;
+
+        this.setFlag("Z", this.registers.D === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "E": {
+        const oldValue = this.registers.E;
+        this.registers.E += 1 & 0xff;
+
+        this.setFlag("Z", this.registers.E === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "H": {
+        const oldValue = this.registers.H;
+        this.registers.H += 1 & 0xff;
+
+        this.setFlag("Z", this.registers.H === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "L": {
+        const oldValue = this.registers.L;
+        this.registers.L += 1 & 0xff;
+
+        this.setFlag("Z", this.registers.L === 0); // Zero flag
+        this.setFlag("N", false); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+    }
   }
 
-  ILLEGAL_DD(operands) {
+  // DEC (decrement) instruction
+  DEC(operands) {
+    const source = operands;
+    switch (source.name) {
+      // Handle 16-bit operations
+      case "BC": {
+        this.registers.C = (this.registers.C - 1) & 0xFF;
+        if (this.registers.C === 0xFF) {
+          this.registers.B = (this.registers.B - 1) & 0xFF;
+        }
+        break;
+      }
+      case "DE": {
+        this.registers.E = (this.registers.E - 1) & 0xFF;
+        if (this.registers.E === 0xFF) {
+          this.registers.D = (this.registers.D - 1) & 0xFF;
+        }
+        break;
+      }
+      case "HL": {
+        this.registers.L = (this.registers.L - 1) & 0xFF;
+        if (this.registers.L === 0xFF) {
+          this.registers.H = (this.registers.H - 1) & 0xFF;
+        }
+        break;
+      }
+      case "SP": {
+        this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+        break;
+      }
+      // Handle 8-bit operations
+      case "B": {
+        const oldValue = this.registers.B;
+        this.registers.B = (this.registers.B - 1) & 0xff;
 
+        this.setFlag("Z", this.registers.B === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0x00); // Half flag
+        break;
+      }
+      case "C": {
+        const oldValue = this.registers.C;
+        this.registers.B = (this.registers.C - 1) & 0xff;
+
+        this.setFlag("Z", this.registers.C === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "D": {
+        const oldValue = this.registers.D;
+        this.registers.B = (this.registers.D - 1) & 0xff;
+
+        this.setFlag("Z", this.registers.D === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "E": {
+        const oldValue = this.registers.E;
+        this.registers.B = (this.registers.E - 1) & 0xff;
+
+        this.setFlag("Z", this.registers.E === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "H": {
+        const oldValue = this.registers.H;
+        this.registers.B = (this.registers.H - 1) & 0xff;
+
+        this.setFlag("Z", this.registers.H === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+      case "L": {
+        const oldValue = this.registers.L;
+        this.registers.B = (this.registers.L - 1) & 0xff;
+
+        this.setFlag("Z", this.registers.L === 0); // Zero flag
+        this.setFlag("N", true); // Subtract flag
+        this.setFlag("H", (oldValue & 0xf) === 0xf); // Half flag
+        break;
+      }
+    }
   }
 
-  RETI(operands) {
+  JP(operands) {}
 
-  }
+  ADC(operands) {}
 
-  SBC(operands) {
+  CALL(operands) {}
 
-  }
+  RETI(operands) {}
 
-  CP(operands) {
+  SBC(operands) {}
 
-  }
+  CP(operands) {}
 
-  PUSH(operands) {
+  PUSH(operands) {}
 
-  }
+  JR(operands) {}
 
-  JR(operands) {
+  SUB(operands) {}
 
-  }
+  RRA(operands) {}
 
-  SUB(operands) {
+  RET(operands) {}
 
-  }
+  OR(operands) {}
 
-  RRA(operands) {
+  POP(operands) {}
 
-  }
+  LDH(operands) {}
 
-  RET(operands) {
+  XOR(operands) {}
 
-  }
+  SRL(operands) {}
 
-  OR(operands) {
+  RR(operands) {}
 
-  }
+  SWAP(operands) {}
 
-  POP(operands) {
+  AND(operands) {}
 
-  }
+  RST(operands) {}
 
-  LDH(operands) {
+  CPL(operands) {}
 
-  }
+  DI(operands) {}
 
-  XOR(operands) {
+  BIT(operands) {}
 
-  }
+  RL(operands) {}
 
-  SRL(operands) {
+  RLCA(operands) {}
 
-  }
+  STOP(operands) {}
 
-  RR(operands) {
+  RES(operands) {}
 
-  }
+  RLC(operands) {}
 
-  SWAP(operands) {
+  EI(operands) {}
 
-  }
+  CCF(operands) {}
 
-  AND(operands) {
+  RRCA(operands) {}
 
-  }
+  SCF(operands) {}
 
-  RST(operands) {
+  HALT(operands) {}
 
-  }
+  DAA(operands) {}
 
-  CPL(operands) {
+  RLA(operands) {}
 
-  }
-
-  DI(operands) {
-
-  }
-
-  BIT(operands) {
-
-  }
-
-  RL(operands) {
-
-  }
-
-  RLCA(operands) {
-
-  }
-
-  STOP(operands) {
-
-  }
-
-  RES(operands) {
-
-  }
-
-  ILLEGAL_E3(operands) {
-
-  }
-
-  RLC(operands) {
-
-  }
-
-  EI(operands) {
-
-  }
-
-  CCF(operands) {
-
-  }
-
-  ILLEGAL_DB(operands) {
-
-  }
-
-  RRCA(operands) {
-
-  }
-
-  ILLEGAL_ED(operands) {
-
-  }
-
-  SCF(operands) {
-
-  }
-
-  ILLEGAL_EC(operands) {
-
-  }
-
-  ILLEGAL_FD(operands) {
-
-  }
-
-  HALT(operands) {
-
-  }
-
-  DAA(operands) {
-
-  }
-
-  RLA(operands) {
-
-  }
-
-  ILLEGAL_E4(operands) {
-
-  }
-
-  SET(operands) {
-
-  }
-
-  ILLEGAL_F4(operands) {
-
-  }
-
-  ILLEGAL_FC(operands) {
-
-  }
-
-  ILLEGAL_EB(operands) {
-
-  }
+  SET(operands) {}
 }
 
 export default CPU;
