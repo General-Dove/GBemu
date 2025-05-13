@@ -56,8 +56,6 @@ export class CPU {
     this.registers.PC += instruction.bytes;
     this.clock += instruction.cycles[0];
 
-    console.log(`Current PC: ${this.registers.PC}`);
-    console.log(`Current Clock: ${this.clock}`);
 
     // Execute the instruction based on mnemonic
     switch (instruction.mnemonic) {
@@ -290,7 +288,6 @@ export class CPU {
   // Decode instruction from opcodes.json
   decodeInstruction(opcode) {
     let opcodeHex = `0x${opcode.toString(16).toUpperCase().padStart(2, "0")}`;
-    console.log(`Decode opcode: ${opcodeHex}`);
 
     // Decode intstruction from prefixed opcodes
     if (opcodeHex === "0xCB") {

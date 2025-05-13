@@ -1,139 +1,217 @@
 export class Display {
-    constructor() {
-        this.canvas = document.createElement("canvas");
-        this.canvas.width = 160;
-        this.canvas.height = 144;
+  constructor() {
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = 160;
+    this.canvas.height = 144;
 
-        this.ctx = this.canvas.getContext("2d");
-        this.imageData = this.ctx.createImageData(160, 144);
+    this.ctx = this.canvas.getContext("2d");
+    this.imageData = this.ctx.createImageData(160, 144);
 
-        this.frameBuffer = new Uint8ClampedArray(160 * 144 * 4);
+    this.frameBuffer = new Uint8ClampedArray(160 * 144 * 4);
 
-        this.clear();
+    this.clear();
 
-        this.palette = [
-            [155, 188, 15], // Lightest green
-            [139, 172, 15], // Light green
-            [48, 98, 48],   // Dark green
-            [15, 56, 15]    // Darkest green
-        ];
-    }
+    this.palette = [
+      [155, 188, 15], // Lightest green
+      [139, 172, 15], // Light green
+      [48, 98, 48], // Dark green
+      [15, 56, 15], // Darkest green
+    ];
+  }
 
-    drawTile(tileData, x, y) {
-        for (let tileY = 0; tileY < 8; tileY++) {
-            const low = tileData[tileY * 2];
-            const high = tileData[tileY * 2 + 1];
+  drawTile(tileData, x, y) {
+    for (let tileY = 0; tileY < 8; tileY++) {
+      const low = tileData[tileY * 2];
+      const high = tileData[tileY * 2 + 1];
 
-            for (let tileX = 0; tileX < 8; tileX++) {
-                const mask = 1 << (7 - tileX);
-                const colorNum = ((high & mask) ? 2 : 0) +((low & mask) ? 1 : 0);
-                const color = this.palette[colorNum];
+      for (let tileX = 0; tileX < 8; tileX++) {
+        const mask = 1 << (7 - tileX);
+        const colorNum = (high & mask ? 2 : 0) + (low & mask ? 1 : 0);
+        const color = this.palette[colorNum];
 
-                const pixelX = x + tileX;
-                const pixelY = y + tileY;
+        const pixelX = x + tileX;
+        const pixelY = y + tileY;
 
-                if (pixelX >= 0 && pixelX < 160 && pixelY >= 0 && pixelY < 144) {
-                    const idx = (pixelY * 160 + pixelX) * 4;
-                    this.frameBuffer[idx] = color[0];
-                    this.frameBuffer[idx + 1] = color[1];
-                    this.frameBuffer[idx + 2] = color[2];
-                    this.frameBuffer[idx + 3] = 255;
-                }
-            }
+        if (pixelX >= 0 && pixelX < 160 && pixelY >= 0 && pixelY < 144) {
+          const idx = (pixelY * 160 + pixelX) * 4;
+          this.frameBuffer[idx] = color[0];
+          this.frameBuffer[idx + 1] = color[1];
+          this.frameBuffer[idx + 2] = color[2];
+          this.frameBuffer[idx + 3] = 255;
         }
+      }
+    }
+  }
+
+  drawScanline(memory, line) {
+    // Check LCD and background enable bits
+    const lcdc = memory.readByte(0xff40);
+    if (!(lcdc & 0x80) || !(lcdc & 0x01)) return;
+
+    // Get scroll positions and addresses
+    const scrollX = memory.readByte(0xff43);
+    const scrollY = memory.readByte(0xff42);
+    const bgTileMap = lcdc & 0x08 ? 0x9c00 : 0x9800;
+    const useSignedAddressing = !(lcdc & 0x10);
+    const bgp = memory.readByte(0xff47);
+
+    // Draw one line of pixels
+    for (let x = 0; x < 160; x++) {
+      // Get background map coordinates with scroll
+      const bgX = (x + scrollX) & 0xff;
+      const bgY = (line + scrollY) & 0xff;
+
+      // Get tile coordinates
+      const tileX = bgX >> 3;
+      const tileY = bgY >> 3;
+
+      // Get pixel position within tile
+      const pixelX = bgX & 7;
+      const pixelY = bgY & 7;
+
+      // Get tile index
+      const mapOffset = (tileY & 0x1f) * 32 + (tileX & 0x1f);
+      const tileIndex = memory.readByte(bgTileMap + mapOffset);
+
+      // Get tile data
+      let tileAddress;
+      if (useSignedAddressing) {
+        // Convert to signed value (-128 to 127)
+        const signedIndex = tileIndex & 0x80 ? tileIndex - 256 : tileIndex;
+        tileAddress = 0x9000 + signedIndex * 16;
+      } else {
+        tileAddress = 0x8000 + tileIndex * 16;
+      }
+
+      // Get color from tile data
+      const byteIndex = pixelY * 2;
+      const byte1 = memory.readByte(tileAddress + byteIndex);
+      const byte2 = memory.readByte(tileAddress + byteIndex + 1);
+      const mask = 1 << (7 - pixelX);
+      const colorNum = (byte2 & mask ? 2 : 0) | (byte1 & mask ? 1 : 0);
+
+      // Apply background palette
+      const paletteColor = (bgp >> (colorNum * 2)) & 0x03;
+      const color = this.palette[paletteColor];
+
+      // Set pixel in framebuffer
+      const idx = (line * 160 + x) * 4;
+      this.frameBuffer[idx] = color[0];
+      this.frameBuffer[idx + 1] = color[1];
+      this.frameBuffer[idx + 2] = color[2];
+      this.frameBuffer[idx + 3] = 255;
+    }
+  }
+
+  debugRenderTile(tileData) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 8;
+    canvas.height = 8;
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.createImageData(8, 8);
+
+    // Render each row of the tile
+    for (let y = 0; y < 8; y++) {
+      const low = tileData[y * 2];
+      const high = tileData[y * 2 + 1];
+
+      // Render each pixel in the row
+      for (let x = 0; x < 8; x++) {
+        const mask = 1 << (7 - x);
+        // Get 2-bit color number from the two tile data bytes
+        const colorNum = (high & mask ? 2 : 0) | (low & mask ? 1 : 0);
+        const color = this.palette[colorNum];
+
+        // Set RGBA values in imageData
+        const idx = (y * 8 + x) * 4;
+        imageData.data[idx] = color[0];
+        imageData.data[idx + 1] = color[1];
+        imageData.data[idx + 2] = color[2];
+        imageData.data[idx + 3] = 255;
+      }
     }
 
-    drawBackground(memory) {
-        // Check LCD and background enable bits
-        const lcdc = memory.readByte(0xFF40);
-        if (!(lcdc & 0x80) || !(lcdc & 0x01)) return;
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  }
 
-        // Get scroll positions and addresses
-        const scrollX = memory.readByte(0xFF43);
-        const scrollY = memory.readByte(0xFF42);
-        const bgTileMap = (lcdc & 0x08) ? 0x9C00 : 0x9800;
-        const useSignedAddressing = !(lcdc & 0x10);
-        const bgp = memory.readByte(0xFF47);
+  debugShowTiles(memory) {
+    const debugDiv = document.createElement("div");
+    debugDiv.style.position = "fixed";
+    debugDiv.style.top = "0";
+    debugDiv.style.right = "0";
+    debugDiv.style.backgroundColor = "white";
+    debugDiv.style.display = "grid";
+    debugDiv.style.gridTemplateColumns = "repeat(16, 8px)";
+    debugDiv.style.border = "1px solid black";
+    debugDiv.style.padding = "4px";
 
-        // Clear framebuffer first
-        this.clear();
+    // Show first 384 tiles (entire VRAM tile data)
+    for (let i = 0; i < 384; i++) {
+      const tileData = memory.getTileData(i, false);
+      const tileCanvas = this.debugRenderTile(tileData);
+      tileCanvas.style.border = "1px solid #ccc";
+      debugDiv.appendChild(tileCanvas);
+    }
 
-        // Draw background tile by tile
-        for (let tileY = 0; tileY < 19; tileY++) {
-            for (let tileX = 0; tileX < 21; tileX++) {
-                // Get visible title position including scroll
-                const mapX = (tileX + (scrollX >> 3)) & 0x1F;
-                const mapY = (tileY + (scrollY >> 3)) & 0x1F;
+    document.body.appendChild(debugDiv);
+  }
 
-                // Get tile index from background map
-                const tileIndex = memory.readByte(bgTileMap + (mapY * 32) + mapX);
+  drawSpriteScanline(memory, line) {
+    // Process sprites in reverse order for priority
+    for (let i = 39; i >= 0; i--) {
+      const baseAddr = 0xfe00 + i * 4;
+      const y = memory.readByte(baseAddr) - 16;
+      const x = memory.readByte(baseAddr + 1) - 8;
+      const tileIndex = memory.readByte(baseAddr + 2);
+      const attributes = memory.readByte(baseAddr + 3);
 
-                // Get tile data
-                const tileData = memory.getTileData(tileIndex, useSignedAddressing);
+      // Check if sprite intersects with this scanline
+      if (y <= line && y + 8 > line) {
+        const palette =
+          attributes & 0x10 ? memory.readByte(0xff49) : memory.readByte(0xff48);
+        const xFlip = attributes & 0x20;
+        const yFlip = attributes & 0x40;
 
-                // Get pixel position within tile
-                const screenX = (tileX * 8) - (scrollX & 7);
-                const screenY = (tileY * 8) - (scrollY & 7);
+        const tileData = memory.getTileData(tileIndex, false);
+        const tileY = yFlip ? 7 - (line - y) : line - y;
 
-                // Draw each pixel of the tile
-                for (let y = 0; y < 8; y++) {
-                    const low = tileData[y * 2];
-                    const high = tileData[y * 2 + 1];
+        for (let tileX = 0; tileX < 8; tileX++) {
+          if (x + tileX >= 0 && x + tileX < 160) {
+            const pixelX = xFlip ? 7 - tileX : tileX;
+            const byteIndex = tileY * 2;
+            const mask = 1 << (7 - pixelX);
+            const colorNum =
+              (tileData[byteIndex + 1] & mask ? 2 : 0) |
+              (tileData[byteIndex] & mask ? 1 : 0);
 
-                    for (let x = 0; x < 8; x++) {
-                        const colorBit = 7 - x;
-                        const colorNum = ((high >> colorBit) & 1) << 1 | ((low >> colorBit) & 1);
-                        const paletteColor = (bgp >> (colorNum * 2)) & 0x03;
-                        const color = this.palette[paletteColor];
+            // Skip transparent pixels
+            if (colorNum === 0) continue;
 
-                        const pixelX = screenX + x;
-                        const pixelY = screenY + y;
+            const paletteColor = (palette >> (colorNum * 2)) & 0x03;
+            const color = this.palette[paletteColor];
 
-                        // Draw visible pixels
-                        if (pixelX >= 0 && pixelX < 160 && pixelY >= 0 && pixelY < 144) {
-                            const idx = (pixelY * 160 + pixelX) * 4;
-                            this.frameBuffer[idx] = color[0];
-                            this.frameBuffer[idx + 1] = color[1];
-                            this.frameBuffer[idx + 2] = color[2];
-                            this.frameBuffer[idx + 3] = 255;
-                        }
-                    }
-                }
-            }   
+            const idx = (line * 160 + x + tileX) * 4;
+            this.frameBuffer[idx] = color[0];
+            this.frameBuffer[idx + 1] = color[1];
+            this.frameBuffer[idx + 2] = color[2];
+            this.frameBuffer[idx + 3] = 255;
+          }
         }
+      }
     }
+  }
 
-    drawSprites(memory) {
-        for (let i = 0; i < 40; i++) {
-            const baseAddr = 0xFE00 + i * 4;
-            const y = memory.readByte(baseAddr) - 16;
-            const x = memory.readByte(baseAddr + 1) - 8;
-            const tileIndex = memory.readByte(baseAddr + 2);
-            const attributes = memory.readByte(baseAddr + 3);
+  clear() {
+    this.frameBuffer.fill(255);
+  }
 
-            if (x < -7 || x > 160 || y < -7 || y > 144) {
-                continue;
-            }
+  render() {
+    this.imageData.data.set(this.frameBuffer);
+    this.ctx.putImageData(this.imageData, 0, 0);
+  }
 
-            const tileData = new Uint8Array(16);
-            for (let j = 0; j < 16; j++) {
-                tileData[j] = memory.readByte(0x8000 + tileIndex * 16 + j);
-            }
-
-            this.drawTile(tileData, x, y);
-        }
-    }
-
-    clear() {
-        this.frameBuffer.fill(255);
-    }
-
-    render() {
-        this.imageData.data.set(this.frameBuffer);
-        this.ctx.putImageData(this.imageData, 0, 0);
-    }
-
-    getCanvas() {
-        return this.canvas;
-    }
+  getCanvas() {
+    return this.canvas;
+  }
 }
