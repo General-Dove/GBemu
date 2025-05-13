@@ -53,9 +53,11 @@ export class CPU {
     }
 
     // Update PC and clock
-    const oldPC = this.registers.PC;
     this.registers.PC += instruction.bytes;
     this.clock += instruction.cycles[0];
+
+    console.log(`Current PC: ${this.registers.PC}`);
+    console.log(`Current Clock: ${this.clock}`);
 
     // Execute the instruction based on mnemonic
     switch (instruction.mnemonic) {

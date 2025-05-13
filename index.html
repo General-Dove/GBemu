@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+            Gameboy Emulator
+        </title>
+        <style>
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+                padding: 20px;
+            }
+            canvas {
+                border: 1px solid black;
+                image-rendering: pixelated;
+                width: 320px;
+                height: 288px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>
+                GameBoy Emulator
+            </h1>
+            <div id="displayContainer"></div>
+        </div>
+        <script type="module">
+            import { GameBoy } from './src/gameboy.js';
+
+            let gameboy = null;
+
+            window.addEventListener('load', () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.gb';
+                document.body.appendChild(fileInput);
+                const displayContainer = document.getElementById('displayContainer');
+
+                fileInput.addEventListener('change', async (e) => {
+                    try {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                    
+                        gameboy = new GameBoy();
+
+                        displayContainer.innerHTML = '';
+                        displayContainer.appendChild(gameboy.display.getCanvas());
+
+                        const arrayBuffer = await file.arrayBuffer();
+                        gameboy.memory.loadROM(arrayBuffer);
+
+                        gameboy.start();
+
+                    } catch(error) {
+                        console.error("Error intializing GameBoy:", error);
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>

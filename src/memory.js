@@ -1,4 +1,3 @@
-import fs from "fs";
 
 export class Memory {
   constructor() {
@@ -78,32 +77,72 @@ export class Memory {
     }
   }
 
-   loadROM(filepath) {
-    try {
-      const romData = fs.readFileSync(filepath);
-      
-      console.log("First 16 bytes of ROM: ");
-      for (let i = 0; i < 16; i++) {
-        console.log(`0x${i.toString(16).padStart(2, "0")}: 0x${romData[i].toString(16).padStart(2, "0")}`);
-      }
+  getTileData(tileIndex, useSignedAddressing = false) {
+    let baseAddress;
+    if (useSignedAddressing) {
+      const signedIndex = (tileIndex & 0x80) ?  -(256 - tileIndex) : tileIndex;
+      baseAddress = 0x9000 + (signedIndex * 16);
+    } else {
+      baseAddress = 0x8000 + (tileIndex * 16);
+    }
 
+    const tileData = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+      tileData[i] = this.readByte(baseAddress + i);
+    }
+
+    return tileData;
+  }
+
+  getBackgroundMapAddress() {
+    return (this.io[0x40] & 0x08) ? 0x9C00 : 0x9800;
+  }
+
+  getTileDataAddress() {
+    return (this.io[0x40] & 0x10) ? 0x8000 : 0x8800;
+  }
+
+   loadROM(data) {
+    try {
+      const romData = new Uint8Array(data);
+
+      // Clear all memory
+      this.vram.fill(0);
+      this.eram.fill(0);
+      this.wram.fill(0);
+      this.oam.fill(0);
+      this.io.fill(0);
+      this.hram.fill(0);
+
+      // Load ROM bank 0
       for (let i = 0; i < 0x4000 && i < romData.length; i++) {
         this.rom0[i] = romData[i];
       }
 
+      // Load ROM bank 1
       for (let i = 0; i < 0x4000 && (i + 0x4000) < romData.length; i++) {
         this.romx[i] = romData[i + 0x4000];
       }
 
-      console.log(`Loaded ROM: ${filepath}, size: ${romData.length}`);
-      console.log("Verifying memory at 0x100:");
-      console.log(`0x100: 0x${this.readByte(0x100).toString(16).padStart(2, "0")}`);
-      console.log(`0x101: 0x${this.readByte(0x100).toString(16).padStart(2, "0")}`);
-      console.log(`0x102: 0x${this.readByte(0x100).toString(16).padStart(2, "0")}`);
+      // Nintendo logo area in VRAM
+      for (let i = 0; i < 48; i++) {
+        this.vram[i] = romData[0x104 + i];
+      }
+
+      // Initialize critical PPU registers
+      this.io[0x40] = 0x91; // Enable LCD and background
+      this.io[0x41] = 0x00; // STAT
+      this.io[0x42] = 0x00; // SCY
+      this.io[0x43] = 0x00; // SCX
+      this.io[0x47] = 0xFC; // BGP - Background palette
+      this.io[0x48] = 0xFF; // OBP0
+      this.io[0x49] = 0xFF; // OBP1
+
+      console.log(`Loaded ROM, size: ${romData.length}`);
+
     } catch (error) {
-      throw new Error(`Failed to load ROM: ${error.message}`);
+      console.error("Failed to load ROM:", error);
+      throw error;
     }
   }
 }
-
-export default Memory;
