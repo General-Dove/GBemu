@@ -19,30 +19,6 @@ export class Display {
     ];
   }
 
-  drawTile(tileData, x, y) {
-    for (let tileY = 0; tileY < 8; tileY++) {
-      const low = tileData[tileY * 2];
-      const high = tileData[tileY * 2 + 1];
-
-      for (let tileX = 0; tileX < 8; tileX++) {
-        const mask = 1 << (7 - tileX);
-        const colorNum = (high & mask ? 2 : 0) + (low & mask ? 1 : 0);
-        const color = this.palette[colorNum];
-
-        const pixelX = x + tileX;
-        const pixelY = y + tileY;
-
-        if (pixelX >= 0 && pixelX < 160 && pixelY >= 0 && pixelY < 144) {
-          const idx = (pixelY * 160 + pixelX) * 4;
-          this.frameBuffer[idx] = color[0];
-          this.frameBuffer[idx + 1] = color[1];
-          this.frameBuffer[idx + 2] = color[2];
-          this.frameBuffer[idx + 3] = 255;
-        }
-      }
-    }
-  }
-
   drawScanline(memory, line) {
     // Check LCD and background enable bits
     const lcdc = memory.readByte(0xff40);
@@ -101,60 +77,6 @@ export class Display {
       this.frameBuffer[idx + 2] = color[2];
       this.frameBuffer[idx + 3] = 255;
     }
-  }
-
-  debugRenderTile(tileData) {
-    const canvas = document.createElement("canvas");
-    canvas.width = 8;
-    canvas.height = 8;
-    const ctx = canvas.getContext("2d");
-    const imageData = ctx.createImageData(8, 8);
-
-    // Render each row of the tile
-    for (let y = 0; y < 8; y++) {
-      const low = tileData[y * 2];
-      const high = tileData[y * 2 + 1];
-
-      // Render each pixel in the row
-      for (let x = 0; x < 8; x++) {
-        const mask = 1 << (7 - x);
-        // Get 2-bit color number from the two tile data bytes
-        const colorNum = (high & mask ? 2 : 0) | (low & mask ? 1 : 0);
-        const color = this.palette[colorNum];
-
-        // Set RGBA values in imageData
-        const idx = (y * 8 + x) * 4;
-        imageData.data[idx] = color[0];
-        imageData.data[idx + 1] = color[1];
-        imageData.data[idx + 2] = color[2];
-        imageData.data[idx + 3] = 255;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    return canvas;
-  }
-
-  debugShowTiles(memory) {
-    const debugDiv = document.createElement("div");
-    debugDiv.style.position = "fixed";
-    debugDiv.style.top = "0";
-    debugDiv.style.right = "0";
-    debugDiv.style.backgroundColor = "white";
-    debugDiv.style.display = "grid";
-    debugDiv.style.gridTemplateColumns = "repeat(16, 8px)";
-    debugDiv.style.border = "1px solid black";
-    debugDiv.style.padding = "4px";
-
-    // Show first 384 tiles (entire VRAM tile data)
-    for (let i = 0; i < 384; i++) {
-      const tileData = memory.getTileData(i, false);
-      const tileCanvas = this.debugRenderTile(tileData);
-      tileCanvas.style.border = "1px solid #ccc";
-      debugDiv.appendChild(tileCanvas);
-    }
-
-    document.body.appendChild(debugDiv);
   }
 
   drawSpriteScanline(memory, line) {

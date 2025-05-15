@@ -32,14 +32,14 @@ export class Memory {
       return this.vram[address - 0x8000];
     } else if (address < 0xc000) {
       return this.eram[address - 0xa000];
-    } else if (address < 0xd000) {
+    } else if (address < 0xe000) {
       return this.wram[address - 0xc000];
     } else if (address < 0xfe00) {
       return this.wram[address - 0xe000];
     } else if (address < 0xfea0) {
       return this.oam[address - 0xfe00];
     } else if (address < 0xff00) {
-      return 0xff;
+      return;
     } else if (address < 0xff80) {
       return this.io[address - 0xff00];
     } else if (address < 0xffff) {
@@ -89,13 +89,10 @@ export class Memory {
 
     // Read tile data directly from VRAM
     const tileData = new Uint8Array(16);
-    const vramAddr = baseAddress - 0x8000;
 
     for (let i = 0; i < 16; i++) {
       // Check reading is within VRAM bounds
-      if (vramAddr + i >= 0 && vramAddr + i < 0x2000) {
-        tileData[i] = this.vram[vramAddr + i];
-      }
+      tileData[i] = this.readByte(baseAddress + i);
     }
 
     return tileData;
@@ -114,7 +111,9 @@ export class Memory {
     const logoStart = 0x104;
     const expectedLogo = [
       0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83,
-      0x00, 0x0c, 0x00, 0x0d,
+      0x00, 0x0c, 0x00, 0x0d, 0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e,
+      0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99, 0xbb, 0xbb, 0x67, 0x63,
+      0x6e, 0x0e, 0xec, 0xcc, 0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e,
     ];
 
     const logoValid = expectedLogo.every(
@@ -132,6 +131,7 @@ export class Memory {
     return logoValid;
   }
 
+  // Load Data to Memory
   loadROM(data) {
     try {
       const romData = new Uint8Array(data);
@@ -142,11 +142,13 @@ export class Memory {
         .replace(/\0+$/, "");
       const cartridgeType = romData[0x147];
       const romSize = romData[0x148];
+      const ramSize = romData[0x149];
 
       console.log("ROM Info:", {
         title,
         cartridgeType: `0x${cartridgeType.toString(16)}`,
         romSize: `${32 << romSize}KB`,
+        ramSize: `${ramSize}KB`,
       });
 
       // Clear all memory
@@ -167,34 +169,6 @@ export class Memory {
         this.romx[i] = romData[i + 0x4000] || 0;
       }
 
-      // Decode and load Nintendo logo tile data into VRAM
-      const logoStart = 0x104;
-      for (let tileIndex = 0; tileIndex < 8; tileIndex++) {
-        // Nintendo logo is 8 tiles
-        const srcOffset = logoStart + tileIndex * 16;
-        const destOffset = tileIndex * 16;
-
-        // Each tile is 16 bytes (8 rows * 2 bytes per row)
-        for (let byteIndex = 0; byteIndex < 16; byteIndex++) {
-          this.vram[destOffset + byteIndex] = romData[srcOffset + byteIndex];
-        }
-      }
-      // Load tiles into VRAM at correct location (0x8800-0x97FF for background)
-      const tileDataStart = 0x8800 - 0x8000; // Offset in VRAM
-      for (let i = 0; i < 256; i++) {
-        // Load 256 tiles
-        const tileOffset = tileDataStart + i * 16;
-        for (let j = 0; j < 16; j++) {
-          this.vram[tileOffset + j] = romData[i * 16 + j] || 0;
-        }
-      }
-
-      // Set up background tile map (0x9800-0x9BFF)
-      const mapStart = 0x9800 - 0x8000; // Offset in VRAM
-      for (let i = 0; i < 32 * 32; i++) {
-        this.vram[mapStart + i] = i & 0xff; // Sequential tile references
-      }
-
       // Initialize critical PPU registers
       this.io[0x40] = 0x91; // Enable LCD and background
       this.io[0x41] = 0x00; // STAT
@@ -208,30 +182,6 @@ export class Memory {
       this.io[0x4a] = 0x00; // WY
       this.io[0x4b] = 0x00; // WX
 
-      // Add detailed debug logging
-      console.log("ROM Load Debug:", {
-        logoTiles: Array.from(this.vram.slice(0, 16 * 8)) // Show all 8 logo tiles
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .reduce((acc, val, i) => {
-            const tileIndex = Math.floor(i / 16);
-            if (!acc[tileIndex]) acc[tileIndex] = [];
-            acc[tileIndex].push(val);
-            return acc;
-          }, []),
-        lcdcValue: "0x" + this.io[0x40].toString(16),
-        bgpValue: "0x" + this.io[0x47].toString(16),
-        tileMapStart: this.getBackgroundMapAddress().toString(16),
-        tileDataStart: this.getTileDataAddress().toString(16),
-      });
-
-      // Add debug output to verify tile data
-      const firstTile = Array.from(this.vram.slice(0, 16)).map((b) =>
-        b.toString(16).padStart(2, "0")
-      );
-      console.log("First tile data:", firstTile);
-      console.log("LCDC value:", this.io[0x40].toString(16));
-      console.log("BGP value:", this.io[0x47].toString(16));
-
       console.log(`Loaded ROM, size: ${romData.length}`);
     } catch (error) {
       console.error("Failed to load ROM:", error);
@@ -239,3 +189,5 @@ export class Memory {
     }
   }
 }
+
+export default Memory;

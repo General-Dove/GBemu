@@ -17,6 +17,9 @@ export class CPU {
       PC: 0x00, // Program counter(pointer)
     };
 
+    this.IME = false;
+    this.pendingIME = false;
+
     this.clock = 0;
 
     this.memory = memory;
@@ -26,36 +29,41 @@ export class CPU {
     // Reset registers and clock
     this.registers = {
       A: 0x01,
-      F: 0xb0,
+      F: 0xB0,
       B: 0x00,
       C: 0x13,
       D: 0x00,
-      E: 0xd8,
+      E: 0xD8,
       H: 0x01,
-      L: 0x4d,
+      L: 0x4D,
       SP: 0xfffe,
       PC: 0x0100,
     };
+
+    this.IME = false;
+    this.pendingIME = false;
 
     this.clock = 0;
   }
 
   // Execute a single instruction
   executeInstruction() {
+
     // Read opcode from memory at current PC
     const opcode = this.memory.readByte(this.registers.PC);
 
+    // Store initial clock value
+    const startClock = this.clock;
+
     // Get instruction data from opcodes.json
     const instruction = this.decodeInstruction(opcode);
+    
+    // Update pcUpdated flag for the new instruction
+    let pcUpdated = false;
 
     if (!instruction) {
       throw new Error(`Unknown opcode: 0x${opcode.toString(16)}`);
     }
-
-    // Update PC and clock
-    this.registers.PC += instruction.bytes;
-    this.clock += instruction.cycles[0];
-
 
     // Execute the instruction based on mnemonic
     switch (instruction.mnemonic) {
@@ -97,6 +105,7 @@ export class CPU {
       // Jump to address
       case "JP":
         this.JP(instruction.operands);
+        pcUpdated = true;
         break;
       // Add value from register & carry flag to A
       case "ADC":
@@ -121,10 +130,12 @@ export class CPU {
       // Call address
       case "CALL":
         this.CALL(instruction.operands);
+        pcUpdated = true;
         break;
       // Return from subroutine if condition is met
       case "RET":
         this.RET(instruction.operands);
+        pcUpdated = true;
         break;
       // Call address(shorter and faster equivalent to CALL for suitable values)
       case "RST":
@@ -133,6 +144,7 @@ export class CPU {
       // Relative jump to address
       case "JR":
         this.JR(instruction.operands);
+        pcUpdated = true;
         break;
       // Rotate register A left
       case "RLCA":
@@ -241,6 +253,24 @@ export class CPU {
       // Default case, throw error if no instruction
       default:
         throw new Error(`Unimplemented instruction: ${instruction.mnemonic}`);
+    }
+
+    // Update PC and clock
+    if (!pcUpdated) {
+      this.registers.PC += instruction.bytes;
+    }
+
+    if (Array.isArray(instruction.cycles)) {
+      if (this.clock === startClock) {
+        this.clock += instruction.cycles[0];
+      } else {
+        this.clock += instruction.cycles[1];
+      }
+    }
+
+    if (this.pendingIME) {
+      this.IME = true;
+      this.pendingIME = false;
     }
   }
   // Helper methods for flag operations
@@ -394,7 +424,7 @@ export class CPU {
 
       // Handle SP + e8 operations
       case "SP": {
-        const e8 = this.memory.readByte(this.registers.PC - 1);
+        const e8 = this.memory.readByte(this.registers.PC + 1);
         const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
         const result = (this.registers.SP + signedE8) & 0xffff;
 
@@ -411,7 +441,7 @@ export class CPU {
       case "A": {
         switch (source.name) {
           case "n8": {
-            const value = this.memory.readByte(this.registers.PC - 1);
+            const value = this.memory.readByte(this.registers.PC + 1);
             const result = (this.registers.A + value) & 0xff;
 
             this.setFlag("Z", result === 0); // Zero flag
@@ -500,7 +530,8 @@ export class CPU {
           }
 
           case "HL": {
-            const value = this.getAddress(source);
+            const address = this.getAddress(source);
+            const value = this.memory.readByte(address);
             const result = (this.registers.A + value) & 0xff;
             this.setFlag("Z", result === 0); // Zero flag
             this.setFlag("N", false); // Subtract flag
@@ -521,9 +552,9 @@ export class CPU {
 
     switch (source.name) {
       // Handle source 16-bit operations
-      case "n16":
-        const lowByte = this.memory.readByte(this.registers.PC - 2);
-        const highByte = this.memory.readByte(this.registers.PC - 1);
+      case "n16": {
+        const lowByte = this.memory.readByte(this.registers.PC + 1);
+        const highByte = this.memory.readByte(this.registers.PC + 2);
 
         switch (dest.name) {
           case "BC":
@@ -537,6 +568,8 @@ export class CPU {
           case "HL":
             this.registers.H = highByte;
             this.registers.L = lowByte;
+
+            //console.log(`LD HL: 0x${((highByte << 8) | lowByte).toString(16).padStart(4, '0')}`);
             break;
           case "SP":
             this.registers.SP = (highByte << 8) | lowByte;
@@ -545,10 +578,11 @@ export class CPU {
             throw new Error(`Invalid destination for LD n16: ${dest.name}`);
         }
         break;
+      }
 
       // Handle source 8-bit operations
-      case "n8":
-        const value = this.memory.readByte(this.registers.PC - 1);
+      case "n8": {
+        const value = this.memory.readByte(this.registers.PC + 1);
 
         if (dest.immediate) {
           this.registers[dest.name] = value;
@@ -557,9 +591,10 @@ export class CPU {
           this.memory.writeByte(address, value);
         }
         break;
+      }
 
       // Handle source register A operations
-      case "A":
+      case "A": {
         if (dest.name === "HL") {
           if (dest.increment) {
             const address = this.getAddress(dest);
@@ -572,6 +607,8 @@ export class CPU {
           } else if (dest.decrement) {
             const address = this.getAddress(dest);
             this.memory.writeByte(address, this.registers.A);
+
+            //console.log(`Register: 0x${address.toString(16)} || Value: ${this.registers.A}`);
 
             const newValue = (address - 1) & 0xffff;
             this.registers.H = (newValue >> 8) & 0xff;
@@ -587,8 +624,8 @@ export class CPU {
           this.memory.writeByte(address, this.registers.A);
           return;
         } else if (dest.name === "a16") {
-          const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-          const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+          const lowByteAddress = this.memory.readByte(this.registers.PC + 1);
+          const highByteAddress = this.memory.readByte(this.registers.PC + 2);
           const address = (highByteAddress << 8) | lowByteAddress;
           this.memory.writeByte(address, this.registers.A);
           return;
@@ -596,115 +633,118 @@ export class CPU {
           this.registers[dest.name] = this.registers.A;
           return;
         }
+      }
 
       // Handle source register B operations
-      case "B":
+      case "B": {
         if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
-          const value = this.memory.readByte(this.registers.B);
+          const value = this.registers.B;
           this.memory.writeByte(address, value);
           return;
         } else {
           this.registers[dest.name] = this.registers.B;
           return;
         }
+      }
 
       // Handle source register C operations
-      case "C":
+      case "C": {
         if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
-          const value = this.memory.readByte(this.registers.C);
+          const value = this.registers.C;
           this.memory.writeByte(address, value);
           return;
         } else {
           this.registers[dest.name] = this.registers.C;
           return;
         }
+      }
 
       // Handle source register D operations
-      case "D":
+      case "D": {
         if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
-          const value = this.memory.readByte(this.registers.D);
+          const value = this.registers.D;
           this.memory.writeByte(address, value);
           return;
         } else {
           this.registers[dest.name] = this.registers.D;
           return;
         }
+      }
 
       // Handle source register E operations
-      case "E":
+      case "E": {
         if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
-          const value = this.memory.readByte(this.registers.E);
+          const value = this.registers.E;
           this.memory.writeByte(address, value);
           return;
         } else {
           this.registers[dest.name] = this.registers.E;
           return;
         }
+      }
 
       // Handle source register H operations
-      case "H":
+      case "H": {
         if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
-          const value = this.memory.readByte(this.registers.H);
+          const value = this.registers.H;
           this.memory.writeByte(address, value);
           return;
         } else {
           this.registers[dest.name] = this.registers.H;
           return;
         }
+      }
 
       // Handle source register L operations
-      case "L":
+      case "L": {
         if (dest.name === "HL" || dest.name === "BC" || dest.name === "DE") {
           const address = this.getAddress(dest);
-          const value = this.memory.readByte(this.registers.L);
+          const value = this.registers.L;
           this.memory.writeByte(address, value);
           return;
         } else {
           this.registers[dest.name] = this.registers.L;
           return;
         }
+      }
 
       // Handle source register HL operations
-      case "HL":
-        // Handle SP special cases
-        if (dest.name === "SP") {
-          this.registers.SP = (this.registers.H << 8) | this.registers.L;
-          return;
+      case "HL": {
+        const address = this.getAddress(source);
+        const value = this.memory.readByte(address);
+
+        if (dest.immediate) {
+          this.registers[dest.name] = value;
+        } else {
+          this.memory.writeByte(this.getAddress(dest), value);
         }
 
         if (source.increment) {
-          const address = (this.registers.H << 8) | this.registers.L;
-          this.registers.A = this.memory.readByte(address);
-
           const newValue = (address + 1) & 0xffff;
           this.registers.H = (newValue >> 8) & 0xff;
           this.registers.L = newValue & 0xff;
-
           return;
         }
 
         if (source.decrement) {
-          const address = (this.registers.H << 8) | this.registers.L;
-          this.registers.A = this.memory.readByte(address);
-
           const newValue = (address - 1) & 0xffff;
           this.registers.H = (newValue >> 8) & 0xff;
           this.registers.L = newValue & 0xff;
-
           return;
         }
         break;
+      }
 
       // Handle source register SP operations
-      case "SP":
+      case "SP": {
         // Handle HL special cases
         if (dest.name === "HL") {
-          const e8 = this.memory.readByte(this.registers.PC - 1);
+          const e8 = this.memory.readByte(this.registers.PC + 1);
           const signedE8 = e8 & 0x80 ? e8 - 256 : e8;
           const result = (this.registers.SP + signedE8) & 0xffff;
 
@@ -718,17 +758,19 @@ export class CPU {
 
           return;
         } else if (dest.name === "a16") {
-          const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-          const highByteAddress = this.memory.readByte(this.registers.PC - 1);
+          const lowByteAddress = this.memory.readByte(this.registers.PC + 1);
+          const highByteAddress = this.memory.readByte(this.registers.PC + 2);
           const address = (highByteAddress << 8) | lowByteAddress;
           this.memory.writeByte(address, this.registers.SP & 0xff);
           this.memory.writeByte(address + 1, (this.registers.SP >> 8) & 0xff);
           return;
         }
         break;
+      }
 
-      default:
+      default: {
         break;
+      }
     }
   }
 
@@ -862,7 +904,7 @@ export class CPU {
       }
       case "C": {
         const oldValue = this.registers.C;
-        this.registers.B = (this.registers.C - 1) & 0xff;
+        this.registers.C = (this.registers.C - 1) & 0xff;
 
         this.setFlag("Z", this.registers.C === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
@@ -871,7 +913,7 @@ export class CPU {
       }
       case "D": {
         const oldValue = this.registers.D;
-        this.registers.B = (this.registers.D - 1) & 0xff;
+        this.registers.D = (this.registers.D - 1) & 0xff;
 
         this.setFlag("Z", this.registers.D === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
@@ -880,7 +922,7 @@ export class CPU {
       }
       case "E": {
         const oldValue = this.registers.E;
-        this.registers.B = (this.registers.E - 1) & 0xff;
+        this.registers.E = (this.registers.E - 1) & 0xff;
 
         this.setFlag("Z", this.registers.E === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
@@ -889,7 +931,7 @@ export class CPU {
       }
       case "H": {
         const oldValue = this.registers.H;
-        this.registers.B = (this.registers.H - 1) & 0xff;
+        this.registers.H = (this.registers.H - 1) & 0xff;
 
         this.setFlag("Z", this.registers.H === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
@@ -898,7 +940,7 @@ export class CPU {
       }
       case "L": {
         const oldValue = this.registers.L;
-        this.registers.B = (this.registers.L - 1) & 0xff;
+        this.registers.L = (this.registers.L - 1) & 0xff;
 
         this.setFlag("Z", this.registers.L === 0); // Zero flag
         this.setFlag("N", true); // Subtract flag
@@ -910,74 +952,56 @@ export class CPU {
 
   JP(operands) {
     const [source, dest] = operands;
+    const lowByteAddress = this.memory.readByte(this.registers.PC + 1);
+    const highByteAddress = this.memory.readByte(this.registers.PC + 2);
+    const address = (highByteAddress << 8) | lowByteAddress;
 
     switch (source.name) {
       case "NZ": {
-        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-        const address = (highByteAddress << 8) | lowByteAddress;
-
         if (!this.getFlag("Z")) {
           this.registers.PC = address;
         } else {
-          this.clock -= 4;
+          this.registers.PC += 3;
         }
         break;
       }
 
       case "a16": {
-        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-        const address = (highByteAddress << 8) | lowByteAddress;
-
         this.registers.PC = address;
         break;
       }
       
       case "Z": {
-        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-        const address = (highByteAddress << 8) | lowByteAddress;
-
         if (this.getFlag("Z")) {
           this.registers.PC = address;
         } else {
-          this.clock -= 4;
+          this.registers.PC += 3;
         }
         break;
       }
 
       case "NC": {
-        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-        const address = (highByteAddress << 8) | lowByteAddress;
-
         if (!this.getFlag("C")) {
           this.registers.PC = address;
         } else {
-          this.clock -= 4;
+          this.registers.PC += 3;
         }
         break;
       }
 
       case "C": {
-        const lowByteAddress = this.memory.readByte(this.registers.PC - 2);
-        const highByteAddress = this.memory.readByte(this.registers.PC - 1);
-        const address = (highByteAddress << 8) | lowByteAddress;
-
         if (this.getFlag("C")) {
           this.registers.PC = address;
         } else {
-          this.clock -= 4;
+          this.registers.PC += 3;
         }
         break;
       }
 
       case "HL": {
         const address = this.getAddress(source);
-        const value = this.memory.readByte(address);
 
-        this.registers.PC = value;
+        this.registers.PC = address;
         break;
       }
     }
@@ -985,7 +1009,81 @@ export class CPU {
 
   ADC(operands) {}
 
-  CALL(operands) {}
+  CALL(operands) {
+    const [source, dest] = operands;
+    const lowByteAddress = this.memory.readByte(this.registers.PC + 1);
+    const highByteAddress = this.memory.readByte(this.registers.PC + 2);
+    const address = (highByteAddress << 8) | lowByteAddress;
+    const returnAddress = this.registers.PC + 3;
+
+    switch (source.name) {
+      case "NZ": {
+        if (!this.getFlag("Z")) {
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, returnAddress & 0xFF);
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, (returnAddress >> 8) & 0xFF);
+
+          this.registers.PC = address;
+        } else {
+          this.registers.PC += 3;
+        }
+        break;
+      }
+
+      case "a16": {
+        this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, returnAddress & 0xFF);
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, (returnAddress >> 8) & 0xFF);
+
+        this.registers.PC = address;
+        break;
+      }
+      
+      case "Z": {
+        if (this.getFlag("Z")) {
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, returnAddress & 0xFF);
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, (returnAddress >> 8) & 0xFF);
+
+          this.registers.PC = address;
+        } else {
+          this.registers.PC += 3;
+        }
+        break;
+      }
+
+      case "NC": {
+        if (!this.getFlag("C")) {
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, returnAddress & 0xFF);
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, (returnAddress >> 8) & 0xFF);
+
+          this.registers.PC = address;
+        } else {
+          this.registers.PC += 3;
+        }
+        break;
+      }
+
+      case "C": {
+        if (this.getFlag("C")) {
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, returnAddress & 0xFF);
+          this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+          this.memory.writeByte(this.registers.SP, (returnAddress >> 8) & 0xFF);
+
+          this.registers.PC = address;
+        } else {
+          this.registers.PC += 3;
+        }
+        break;
+      }
+    }
+  }
 
   RETI(operands) {}
 
@@ -995,7 +1093,52 @@ export class CPU {
 
   PUSH(operands) {}
 
-  JR(operands) {}
+  JR(operands) {
+    const [source] = operands;
+    const offset = this.memory.readByte(this.registers.PC + 1);
+    // Convert to signed value (-128 to +127)
+    const signedOffset = offset & 0x80 ? offset - 256 : offset;
+
+    switch (source.name) {
+        case "NZ": {
+            if (!this.getFlag("Z")) {
+                this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
+            } else {
+                this.registers.PC += 2;  // Skip if condition not met
+            }
+            break;
+        }
+        case "Z": {
+            if (this.getFlag("Z")) {
+                this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
+            } else {
+                this.registers.PC += 2;  // Skip if condition not met
+            }
+            break;
+        }
+        case "NC": {
+            if (!this.getFlag("C")) {
+                this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
+            } else {
+                this.registers.PC += 2;  // Skip if condition not met
+            }
+            break;
+        }
+        case "C": {
+            if (this.getFlag("C")) {
+                this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
+            } else {
+                this.registers.PC += 2;  // Skip if condition not met
+            }
+            break;
+        }
+        // Unconditional jump
+        case "e8": {
+            this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
+            break;
+        }
+    }
+  }
 
   // SUB (subtract) instructions
   SUB(operands) {
@@ -1003,7 +1146,7 @@ export class CPU {
 
     switch (source.name) {
       case "n8": {
-        const value = this.memory.readByte(this.registers.PC - 1);
+        const value = this.memory.readByte(this.registers.PC + 1);
         const oldValue = this.registers.A;
         const result = (this.registers.A - value) & 0xff;
 
@@ -1099,7 +1242,8 @@ export class CPU {
       }
 
       case "HL": {
-        const value = this.getAddress(source);
+        const address = this.getAddress(source);
+        const value = this.memory.readByte(address);
         const oldValue = this.registers.A;
         const result = (this.registers.A - value) & 0xff;
         this.setFlag("Z", result === 0); // Zero flag
@@ -1114,14 +1258,84 @@ export class CPU {
 
   RRA(operands) {}
 
-  RET(operands) {}
+  RET(operands) {
+    if (!operands || operands.length === 0) {
+      // Debug logs
+        const lowByte = this.memory.readByte(this.registers.SP);
+        this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+        const highByte = this.memory.readByte(this.registers.SP);
+        this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+        
+        const returnAddress = (lowByte << 8) | highByte;
+
+        this.registers.PC = returnAddress;
+        return;
+    }
+
+    const [source] = operands;
+    
+    switch (source.name) {
+        case "NZ": {
+            if (!this.getFlag("Z")) {
+                const lowByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                const highByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                
+                this.registers.PC = (lowByte << 8) | highByte;
+            } else {
+                this.registers.PC += 1;
+            }
+            break;
+        }
+        case "Z": {
+            if (this.getFlag("Z")) {
+                const lowByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                const highByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                
+                this.registers.PC = (lowByte << 8) | highByte;
+            } else {
+                this.registers.PC += 1;
+            }
+            break;
+        }
+        case "NC": {
+            if (!this.getFlag("C")) {
+                const lowByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                const highByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                
+                this.registers.PC = (lowByte << 8) | highByte;
+            } else {
+                this.registers.PC += 1;
+            }
+            break;
+        }
+        case "C": {
+            if (this.getFlag("C")) {
+                const lowByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                const highByte = this.memory.readByte(this.registers.SP);
+                this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+                
+                this.registers.PC = (lowByte << 8) | highByte;
+            } else {
+                this.registers.PC += 1;
+            }
+            break;
+        }
+    }
+  }
 
   OR(operands) {
     const [dest, source] = operands;
 
     switch (source.name) {
       case "n8": {
-        const value = this.memory.readByte(this.registers.PC - 1);
+        const value = this.memory.readByte(this.registers.PC + 1);
         const result = this.registers.A | value;
 
         this.setFlag("Z", result === 0); // Zero flag
@@ -1225,14 +1439,39 @@ export class CPU {
 
   POP(operands) {}
 
-  LDH(operands) {}
+  LDH(operands) {
+    const [dest, source] = operands;
+
+    switch (source.name) {
+      case "A": {
+        if (dest.name === "a8") {
+          const offset = this.memory.readByte(this.registers.PC + 1);
+          this.memory.writeByte(0xFF00 | offset, this.registers.A);
+        } else if (dest.name === "C") {
+            this.memory.writeByte(0xFF00 | this.registers.C, this.registers.A);
+        }
+        break;
+      }
+
+      case "a8": {
+          const offset = this.memory.readByte(this.registers.PC + 1);
+          this.registers.A = this.memory.readByte(0xFF00 | offset);
+        break;
+      }
+
+      case "C": {
+          this.registers.A = this.memory.readByte(0xFF00 | this.registers.C);
+        break;
+      }
+    }
+  }
 
   XOR(operands) {
     const [dest, source] = operands;
 
     switch (source.name) {
       case "n8": {
-        const value = this.memory.readByte(this.registers.PC - 1);
+        const value = this.memory.readByte(this.registers.PC + 1);
         const result = this.registers.A ^ value;
 
         this.setFlag("Z", result === 0); // Zero flag
@@ -1345,7 +1584,7 @@ export class CPU {
 
     switch (source.name) {
       case "n8": {
-        const value = this.memory.readByte(this.registers.PC - 1);
+        const value = this.memory.readByte(this.registers.PC + 1);
         const result = this.registers.A & value;
 
         this.setFlag("Z", result === 0); // Zero flag
@@ -1451,7 +1690,10 @@ export class CPU {
 
   CPL(operands) {}
 
-  DI(operands) {}
+  DI() {
+    this.IME = false;
+    this.pendingIME = false;
+  }
 
   BIT(operands) {}
 
@@ -1465,7 +1707,9 @@ export class CPU {
 
   RLC(operands) {}
 
-  EI(operands) {}
+  EI() {
+    this.pendingIME = true;
+  }
 
   CCF(operands) {}
 

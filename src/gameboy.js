@@ -7,15 +7,11 @@ export class GameBoy {
     this.memory = new Memory();
     this.cpu = new CPU(this.memory);
     this.display = new Display();
+    
     this.cpu.reset();
-
-    this.ppuMode = 2;
+    this.ppuMode = 0;
     this.ppuLine = 0;
     this.ppuCycles = 0;
-
-    this.memory.writeByte(0xff40, 0x91);
-    this.memory.writeByte(0xff41, 0x85);
-    this.memory.writeByte(0xff44, 0x00);
 
     if (typeof document !== "undefined") {
       document.body.appendChild(this.display.getCanvas());
@@ -42,6 +38,7 @@ export class GameBoy {
     }
 
     this.display.render();
+    this.frameCount++;
   }
 
   updateGraphics(cycles) {
@@ -79,7 +76,6 @@ export class GameBoy {
             this.updateStatMode(1);
             // VBlank interrupt
             this.memory.writeByte(0xff0f, this.memory.readByte(0xff0f) | 0x01);
-            this.display.render();
           } else {
             this.ppuMode = 2;
             this.updateStatMode(2);
@@ -100,6 +96,9 @@ export class GameBoy {
         }
         break;
     }
+
+    // Update LY register
+    this.memory.writeByte(0xff44, this.ppuLine);
   }
 
   updateStatMode(mode) {
@@ -115,34 +114,6 @@ export class GameBoy {
     }
   }
 
-  debugRenderTile(tileData) {
-    const canvas = document.createElement("canvas");
-    canvas.width = 8;
-    canvas.height = 8;
-    const ctx = canvas.getContext("2d");
-    const imageData = ctx.createImageData(8, 8);
-
-    for (let y = 0; y < 8; y++) {
-      const low = tileData[y * 2];
-      const high = tileData[y * 2 + 1];
-
-      for (let x = 0; x < 8; x++) {
-        const mask = 1 << (7 - x);
-        const colorNum = (high & mask ? 2 : 0) | (low & mask ? 1 : 0);
-        const color = this.palette[colorNum];
-
-        const idx = (y * 8 + x) * 4;
-        imageData.data[idx] = color[0];
-        imageData.data[idx + 1] = color[1];
-        imageData.data[idx + 2] = color[2];
-        imageData.data[idx + 3] = 255;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    return canvas;
-  }
-  
   start() {
     // Debug checks
     if (!this.memory.verifyROMData()) {
@@ -150,15 +121,33 @@ export class GameBoy {
       return;
     }
 
-    // Show tile debug
-    this.display.debugShowTiles(this.memory);
-
-    const frameTime = 1000 / 60;
-
     console.log("Starting emulator...");
 
-    setInterval(() => {
-      this.runFrame();
-    }, frameTime);
+    // Disable LCD initially
+    this.memory.writeByte(0xff40, 0x00);
+    
+    // Wait a few frames for initialization
+    let initFrames = 0;
+    const initLoop = () => {
+        this.runFrame();
+        initFrames++;
+        
+        if (initFrames >= 3) {
+            // Enable LCD and background
+            this.memory.writeByte(0xff40, 0x91);
+            // Start normal execution
+            requestAnimationFrame(() => this.update());
+        } else {
+            requestAnimationFrame(initLoop);
+        }
+    };
+    
+    requestAnimationFrame(initLoop);
+  }
+
+  update() {
+
+    this.runFrame();
+    requestAnimationFrame(() => this.update());
   }
 }
