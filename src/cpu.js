@@ -49,14 +49,18 @@ export class CPU {
   // Execute a single instruction
   executeInstruction() {
 
+    let cycles = 0;
+
     // Read opcode from memory at current PC
     const opcode = this.memory.readByte(this.registers.PC);
 
-    // Store initial clock value
-    const startClock = this.clock;
+    // Store initial clock branch value
+    let clockBranch = false;
 
     // Get instruction data from opcodes.json
     const instruction = this.decodeInstruction(opcode);
+
+    console.log(`Current PC: ${this.registers.PC.toString(16)}`);
     
     // Update pcUpdated flag for the new instruction
     let pcUpdated = false;
@@ -104,8 +108,8 @@ export class CPU {
         break;
       // Jump to address
       case "JP":
-        this.JP(instruction.operands);
         pcUpdated = true;
+        clockBranch = this.JP(instruction.operands);
         break;
       // Add value from register & carry flag to A
       case "ADC":
@@ -129,13 +133,13 @@ export class CPU {
         break;
       // Call address
       case "CALL":
-        this.CALL(instruction.operands);
         pcUpdated = true;
+        clockBranch = this.CALL(instruction.operands);
         break;
       // Return from subroutine if condition is met
       case "RET":
-        this.RET(instruction.operands);
         pcUpdated = true;
+        clockBranch = this.RET(instruction.operands);
         break;
       // Call address(shorter and faster equivalent to CALL for suitable values)
       case "RST":
@@ -143,8 +147,8 @@ export class CPU {
         break;
       // Relative jump to address
       case "JR":
-        this.JR(instruction.operands);
         pcUpdated = true;
+        clockBranch = this.JR(instruction.operands);
         break;
       // Rotate register A left
       case "RLCA":
@@ -261,10 +265,12 @@ export class CPU {
     }
 
     if (Array.isArray(instruction.cycles)) {
-      if (this.clock === startClock) {
+      if (!clockBranch) {
         this.clock += instruction.cycles[0];
+        cycles = instruction.cycles[0];
       } else {
         this.clock += instruction.cycles[1];
+        cycles = instruction.cycles[1];
       }
     }
 
@@ -272,6 +278,7 @@ export class CPU {
       this.IME = true;
       this.pendingIME = false;
     }
+    return cycles;
   }
   // Helper methods for flag operations
   setFlag(flag, value) {
@@ -607,8 +614,6 @@ export class CPU {
           } else if (dest.decrement) {
             const address = this.getAddress(dest);
             this.memory.writeByte(address, this.registers.A);
-
-            //console.log(`Register: 0x${address.toString(16)} || Value: ${this.registers.A}`);
 
             const newValue = (address - 1) & 0xffff;
             this.registers.H = (newValue >> 8) & 0xff;
@@ -962,6 +967,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -976,6 +982,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -985,6 +992,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -994,6 +1002,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -1027,6 +1036,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -1051,6 +1061,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -1065,6 +1076,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -1079,6 +1091,7 @@ export class CPU {
           this.registers.PC = address;
         } else {
           this.registers.PC += 3;
+          return true;
         }
         break;
       }
@@ -1105,6 +1118,7 @@ export class CPU {
                 this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
             } else {
                 this.registers.PC += 2;  // Skip if condition not met
+                return true;
             }
             break;
         }
@@ -1113,6 +1127,7 @@ export class CPU {
                 this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
             } else {
                 this.registers.PC += 2;  // Skip if condition not met
+                return true;
             }
             break;
         }
@@ -1121,6 +1136,7 @@ export class CPU {
                 this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
             } else {
                 this.registers.PC += 2;  // Skip if condition not met
+                return true;
             }
             break;
         }
@@ -1129,6 +1145,7 @@ export class CPU {
                 this.registers.PC = (this.registers.PC + 2 + signedOffset) & 0xFFFF;
             } else {
                 this.registers.PC += 2;  // Skip if condition not met
+                return true;
             }
             break;
         }
@@ -1285,6 +1302,7 @@ export class CPU {
                 this.registers.PC = (lowByte << 8) | highByte;
             } else {
                 this.registers.PC += 1;
+                return true;
             }
             break;
         }
@@ -1298,6 +1316,7 @@ export class CPU {
                 this.registers.PC = (lowByte << 8) | highByte;
             } else {
                 this.registers.PC += 1;
+                return true;
             }
             break;
         }
@@ -1311,6 +1330,7 @@ export class CPU {
                 this.registers.PC = (lowByte << 8) | highByte;
             } else {
                 this.registers.PC += 1;
+                return true;
             }
             break;
         }
@@ -1324,6 +1344,7 @@ export class CPU {
                 this.registers.PC = (lowByte << 8) | highByte;
             } else {
                 this.registers.PC += 1;
+                return true;
             }
             break;
         }

@@ -57,6 +57,7 @@ export class Memory {
       return;
     } else if (address < 0xa000) {
       this.vram[address - 0x8000] = value;
+      console.log(`VRAM write: ${address.toString(16)} = ${value.toString(16)}`);
     } else if (address < 0xc000) {
       this.eram[address - 0xa000] = value;
     } else if (address < 0xe000) {
