@@ -22,7 +22,6 @@ export class Display {
   drawScanline(memory, line) {
     // Check LCD and background enable bits
     const lcdc = memory.readByte(0xff40);
-    if (!(lcdc & 0x80) || !(lcdc & 0x01)) return;
 
     // Get scroll positions and addresses
     const scrollX = memory.readByte(0xff43);

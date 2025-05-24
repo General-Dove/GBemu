@@ -19,6 +19,7 @@ export class CPU {
 
     this.IME = false;
     this.pendingIME = false;
+    this.halted = false;
 
     this.clock = 0;
 
@@ -49,6 +50,18 @@ export class CPU {
   // Execute a single instruction
   executeInstruction() {
 
+    // Halted instructions
+    if (this.halted) {
+      const IE = this.memory.readByte(0xFFFF);
+      const IF = this.memory.readByte(0xFF0F);
+      console.log("HALT check: IE", IE.toString(2), "IF", IF.toString(2));
+      if ((IE & IF & 0x1F) !== 0) {
+        this.halted = false;
+      } else {
+        return 4;
+      }
+    }
+
     let cycles = 0;
 
     // Read opcode from memory at current PC
@@ -59,8 +72,6 @@ export class CPU {
 
     // Get instruction data from opcodes.json
     const instruction = this.decodeInstruction(opcode);
-
-    console.log(`Current PC: ${this.registers.PC.toString(16)}`);
     
     // Update pcUpdated flag for the new instruction
     let pcUpdated = false;
@@ -185,6 +196,7 @@ export class CPU {
       // Enter CPU low-power consumption mode until an interrupt occurs
       case "HALT":
         this.HALT();
+        pcUpdated = true;
         break;
       // Enter CPU very low power mode
       case "STOP":
@@ -278,6 +290,44 @@ export class CPU {
       this.IME = true;
       this.pendingIME = false;
     }
+
+    if (this.IME) {
+      const IE = this.memory.readByte(0xFFFF);
+      let IF = this.memory.readByte(0xFF0F);
+      const fired = IE & IF & 0x1F;
+
+      if (fired) {
+        // Find the highest priority interrupt (lowest bit set)
+        let interruptNum = 0;
+        while (((fired >> interruptNum) & 1) === 0) interruptNum++;
+
+        // Interrupt vectors
+        const vectors = [0x40, 0x48, 0x50, 0x58, 0x60];
+
+        // Clear IME
+        this.IME = false;
+
+        // Clear the interrupt flag bit
+        IF &= ~(1 << interruptNum);
+        this.memory.writeByte(0xFF0F, IF);
+
+        // Push PC to stack
+        this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+        this.memory.writeByte(this.registers.SP, (this.registers.PC >> 8) & 0xFF);
+        this.registers.SP = (this.registers.SP - 1) & 0xFFFF;
+        this.memory.writeByte(this.registers.SP, this.registers.PC & 0xFF);
+
+        // Jump to interrupt vector
+        this.registers.PC = vectors[interruptNum];
+
+        // Servicing an interrupt takes 20 cycles
+        return 20;
+      }
+    }
+
+
+
+
     return cycles;
   }
   // Helper methods for flag operations
@@ -575,8 +625,6 @@ export class CPU {
           case "HL":
             this.registers.H = highByte;
             this.registers.L = lowByte;
-
-            //console.log(`LD HL: 0x${((highByte << 8) | lowByte).toString(16).padStart(4, '0')}`);
             break;
           case "SP":
             this.registers.SP = (highByte << 8) | lowByte;
@@ -725,8 +773,6 @@ export class CPU {
 
         if (dest.immediate) {
           this.registers[dest.name] = value;
-        } else {
-          this.memory.writeByte(this.getAddress(dest), value);
         }
 
         if (source.increment) {
@@ -1098,7 +1144,20 @@ export class CPU {
     }
   }
 
-  RETI(operands) {}
+  RETI() {
+    const lowByte = this.memory.readByte(this.registers.SP);
+        this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+        const highByte = this.memory.readByte(this.registers.SP);
+        this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
+        
+        const returnAddress = (lowByte << 8) | highByte;
+
+        this.registers.PC = returnAddress;
+
+        this.pendingIME = true;
+
+        return;
+  }
 
   SBC(operands) {}
 
@@ -1277,7 +1336,6 @@ export class CPU {
 
   RET(operands) {
     if (!operands || operands.length === 0) {
-      // Debug logs
         const lowByte = this.memory.readByte(this.registers.SP);
         this.registers.SP = (this.registers.SP + 1) & 0xFFFF;
         const highByte = this.memory.readByte(this.registers.SP);
@@ -1738,7 +1796,9 @@ export class CPU {
 
   SCF(operands) {}
 
-  HALT(operands) {}
+  HALT() {
+    this.halted = true;
+  }
 
   DAA(operands) {}
 
